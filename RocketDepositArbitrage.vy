@@ -47,8 +47,6 @@ event Arbitrage:
   deposit: indexed(uint256)
   profit: uint256
 
-DEFAULT_FEE: constant(uint24) = 500
-
 owner: public(address)
 
 rocketStorage: immutable(RocketStorageInterface)
@@ -102,13 +100,12 @@ def fund():
 def __default__():
   assert msg.sender == wethToken.address, "only WETH can send ETH; use fund() instead"
 
-# Require 16 (or wethAmount) WETH balance,
+# Require wethAmount WETH balance,
 # Mint rETH with Rocket Pool at protocol rate,
 # Swap rETH for WETH on Uniswap (approve Uniswap to spend rETH, execute swap),
 # Return ETH profit to caller
 @external
-def arb(uniswapFee: uint24 = DEFAULT_FEE,
-        wethAmount: uint256 = as_wei_value(16, "ether")):
+def arb(uniswapFee: uint24, wethAmount: uint256):
   assert wethToken.balanceOf(self) >= wethAmount, "not enough WETH, please fund()"
 
   wethToken.withdraw(wethAmount)
