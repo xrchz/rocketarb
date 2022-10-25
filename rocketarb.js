@@ -12,6 +12,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-f, --max-fee <maxFee>', 'max transaction fee in gwei')
        .option('-i, --max-prio <maxPrio>', 'max transaction priority fee in gwei')
        .option('-x, --extra-args <args>', 'extra (space-separated) arguments to pass to daemon calls')
+       .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
        .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', 10)
        .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
        .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
@@ -112,42 +113,54 @@ const flashbotsProvider = await flashbots.FlashbotsBundleProvider.create(
 const currentBlockNumber = await provider.getBlockNumber()
 const currentBlock = await provider.getBlock(currentBlockNumber)
 const currentBaseFeePerGas = currentBlock.baseFeePerGas
-const maxTries = parseInt(options.maxTries)
-const maxBaseFeeInFutureBlock = flashbots.FlashbotsBundleProvider.getMaxBaseFeeInFutureBlock(
-  currentBaseFeePerGas, maxTries)
 
-console.assert(signedDepositTx.maxFeePerGas.gte(maxBaseFeeInFutureBlock),
-  `gas price too low: max predicted base fee is ${ethers.utils.formatUnits(maxBaseFeeInFutureBlock, 'gwei')} gwei`)
-
-const targetBlockNumbers = []
-const promises = []
-for (let targetBlockNumber = currentBlockNumber + 1; targetBlockNumber <= currentBlockNumber + maxTries; targetBlockNumber++) {
-  targetBlockNumbers.push(targetBlockNumber)
-  promises.push(flashbotsProvider.sendBundle(bundle, targetBlockNumber))
-}
-const submissions = await Promise.all(promises)
-// const failures = []
-
-for (const [i, targetBlockNumber] of targetBlockNumbers.entries()) {
-  const submission = submissions[i]
+if (options.dryRun) {
+  const targetBlockNumber = currentBlockNumber + 1
   console.log(`Target block number: ${targetBlockNumber}`)
-  if ('error' in submission) {
-    console.log(`RelayResponseError:\n${JSON.stringify(submission)}`)
+  const signedBundle = await flashbotsProvider.signBundle(bundle)
+  const simulation = await flashbotsProvider.simulate(signedBundle, targetBlockNumber)
+  console.log(JSON.stringify(simulation, null, 2))
+  const bundlePricing = flashbotsProvider.calculateBundlePricing(simulation.results, currentbaseFeePerGas)
+  console.log(JSON.stringify(bundlePricing, null, 2))
+}
+else {
+  const maxTries = parseInt(options.maxTries)
+  const maxBaseFeeInFutureBlock = flashbots.FlashbotsBundleProvider.getMaxBaseFeeInFutureBlock(
+    currentBaseFeePerGas, maxTries)
+
+  console.assert(signedDepositTx.maxFeePerGas.gte(maxBaseFeeInFutureBlock),
+    `gas price too low: max predicted base fee is ${ethers.utils.formatUnits(maxBaseFeeInFutureBlock, 'gwei')} gwei`)
+
+  const targetBlockNumbers = []
+  const promises = []
+  for (let targetBlockNumber = currentBlockNumber + 1; targetBlockNumber <= currentBlockNumber + maxTries; targetBlockNumber++) {
+    targetBlockNumbers.push(targetBlockNumber)
+    promises.push(flashbotsProvider.sendBundle(bundle, targetBlockNumber))
   }
-  else {
-    const resolution = await submission.wait()
-    console.log(`Resolution: ${flashbots.FlashbotsBundleResolution[resolution]}`)
-    if (resolution === flashbots.FlashbotsBundleResolution.BlockPassedWithoutInclusion) {
-      /*
-      if (network.chainId === 1) {
-        failures.push([submission, targetBlockNumber])
-      }
-      */
-      continue
+  const submissions = await Promise.all(promises)
+  // const failures = []
+
+  for (const [i, targetBlockNumber] of targetBlockNumbers.entries()) {
+    const submission = submissions[i]
+    console.log(`Target block number: ${targetBlockNumber}`)
+    if ('error' in submission) {
+      console.log(`RelayResponseError:\n${JSON.stringify(submission)}`)
     }
     else {
-      console.log('Bundle successfully included on chain!')
-      process.exit(0)
+      const resolution = await submission.wait()
+      console.log(`Resolution: ${flashbots.FlashbotsBundleResolution[resolution]}`)
+      if (resolution === flashbots.FlashbotsBundleResolution.BlockPassedWithoutInclusion) {
+        /*
+        if (network.chainId === 1) {
+          failures.push([submission, targetBlockNumber])
+        }
+        */
+        continue
+      }
+      else {
+        console.log('Bundle successfully included on chain!')
+        process.exit(0)
+      }
     }
   }
 }
