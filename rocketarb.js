@@ -5,6 +5,7 @@ const { program } = require('commander')
 const ethers = require('ethers')
 const flashbots = require('@flashbots/ethers-provider-bundle')
 const prompt = require('prompt-sync')()
+const fs = require('fs/promises')
 
 program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-d, --daemon <cmd>', 'command (+ args if req) to run the rocketpool smartnode daemon', 'docker exec rocketpool_node /go/bin/rocketpool')
@@ -13,6 +14,8 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-i, --max-prio <maxPrio>', 'max transaction priority fee in gwei')
        .option('-x, --extra-args <args>', 'extra (space-separated) arguments to pass to daemon calls')
        .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
+       .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
+       .option('-e, --resume', 'do not create a new bundle, instead submit the one saved in the bundle file')
        .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', 10)
        .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
        .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
@@ -23,90 +26,113 @@ program.parse()
 const options = program.opts()
 
 console.log('Welcome to RocketArb: Deposit!')
-var answer = prompt('Have you done a dry run of depositing your minipool using the smartnode? ')
-if (!(answer === 'y' || answer === 'yes')) {
-  console.log('Do that first then retry.')
-  process.exit()
-}
 
-var cmd = options.daemon
-if (options.maxFee) cmd = cmd.concat(' --maxFee ', options.maxFee)
-if (options.maxPrio) cmd = cmd.concat(' -- maxPrioFee ', options.maxPrio)
-if (options.extraArgs) cmd = cmd.concat(' ', options.extraArgs)
-const salt = options.salt ? parseInt(options.salt, 16) : Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
+if (!options.resume) {
+  var answer = prompt('Have you done a dry run of depositing your minipool using the smartnode? ')
+  if (!(answer === 'y' || answer === 'yes')) {
+    console.log('Do that first then retry.')
+    process.exit()
+  }
+}
 
 const oneEther = ethers.utils.parseUnits("1", "ether")
 const oneGwei = ethers.utils.parseUnits("1", "gwei")
-
 const amountWei = oneEther.mul(options.amount)
 
-cmd = cmd.concat(' api node deposit ',
-  ethers.utils.formatUnits(amountWei, "wei"),
-  ' 0.15 ',
-  salt.toString(),
-  ' false')
-
-console.log(`Executing ${cmd}`)
-
-const cmdOutput = execSync(cmd)
-const encodedSignedDepositTx = `0x${cmdOutput.toString().trim()}`
-console.log(`Got tx: ${encodedSignedDepositTx}`)
-const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
-
-/* verbose logging
-console.log('Which parses as')
-function ppTx(tx) {
-  return [
-    `hash:${tx.hash}`,
-    `to:${tx.to}`,
-    `from:${tx.from}`,
-    `nonce:${tx.nonce}`,
-    `gasLimit:${tx.gasLimit.toString()}`,
-    `maxFeePerGas:${ethers.utils.formatUnits(tx.maxFeePerGas, "gwei")}`,
-    `maxPriorityFeePerGas:${ethers.utils.formatUnits(tx.maxPriorityFeePerGas, "gwei")}`,
-    `data:${tx.data}`,
-    `value:${ethers.utils.formatUnits(tx.value, "ether")}`,
-    `chainId:${tx.chainId}`].join('\n')
-}
-console.log(ppTx(signedDepositTx))
-*/
-
-console.log('Creating arb transaction')
-
+const randomSigner = ethers.Wallet.createRandom()
 const provider = new ethers.providers.JsonRpcProvider(options.rpc)
-const arbAbi = ["function arb(uint24 uniswapFee, uint256 wethAmount) nonpayable"]
-const arbContract = new ethers.Contract(options.arbContract, arbAbi, provider)
+
+function getDepositTx() {
+  var cmd = options.daemon
+  if (options.maxFee) cmd = cmd.concat(' --maxFee ', options.maxFee)
+  if (options.maxPrio) cmd = cmd.concat(' --maxPrioFee ', options.maxPrio)
+  if (options.extraArgs) cmd = cmd.concat(' ', options.extraArgs)
+  const salt = options.salt ? parseInt(options.salt, 16) : Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
+
+  cmd = cmd.concat(' api node deposit ',
+    ethers.utils.formatUnits(amountWei, "wei"),
+    ' 0.15 ',
+    salt.toString(),
+    ' false')
+
+  console.log(`Creating deposit transaction by executing smartnode: ${cmd}`)
+
+  const cmdOutput = execSync(cmd)
+  const encodedSignedDepositTx = `0x${cmdOutput.toString().trim()}`
+  // console.log(`Got tx: ${encodedSignedDepositTx}`)
+  console.log(`Got deposit transaction data from smartnode`)
+  return encodedSignedDepositTx
+}
+
+async function getArbTx(encodedSignedDepositTx) {
+  console.log('Creating arb transaction')
+
+  const arbAbi = ["function arb(uint24 uniswapFee, uint256 wethAmount) nonpayable"]
+  const arbContract = new ethers.Contract(options.arbContract, arbAbi, provider)
+
+  const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
+  const unsignedArbTx = await arbContract.populateTransaction.arb(options.uniFee, amountWei)
+  unsignedArbTx.type = 2
+  unsignedArbTx.chainId = signedDepositTx.chainId
+  unsignedArbTx.nonce = signedDepositTx.nonce + 1
+  unsignedArbTx.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas
+  unsignedArbTx.maxFeePerGas = signedDepositTx.maxFeePerGas
+  unsignedArbTx.gasLimit = parseInt(options.gasLimit)
+
+  // sign randomly first to get around go-ethereum unmarshalling issue
+  const fakeSigned = await randomSigner.signTransaction(unsignedArbTx)
+  cmd = options.daemon.concat(' api node sign ', fakeSigned.substring(2))
+  const signOutput = JSON.parse(execSync(cmd))
+  console.assert(signOutput.status === 'success', `signing arb transaction failed: ${signOutput.error}`)
+  const encodedSignedArbTx = signOutput.signedData
+
+  console.log('Signed arb transaction with smartnode')
+
+  return encodedSignedArbTx
+}
+
+async function makeBundle() {
+  const encodedSignedDepositTx = getDepositTx()
+  /* verbose logging
+  console.log('Deposit tx parses as')
+  function ppTx(tx) {
+    return [
+      `hash:${tx.hash}`,
+      `to:${tx.to}`,
+      `from:${tx.from}`,
+      `nonce:${tx.nonce}`,
+      `gasLimit:${tx.gasLimit.toString()}`,
+      `maxFeePerGas:${ethers.utils.formatUnits(tx.maxFeePerGas, "gwei")}`,
+      `maxPriorityFeePerGas:${ethers.utils.formatUnits(tx.maxPriorityFeePerGas, "gwei")}`,
+      `data:${tx.data}`,
+      `value:${ethers.utils.formatUnits(tx.value, "ether")}`,
+      `chainId:${tx.chainId}`].join('\n')
+  }
+  console.log(ppTx(ethers.utils.parseTransaction(encodedSignedDepositTx)))
+  */
+  const encodedSignedArbTx = await getArbTx(encodedSignedDepositTx)
+  const bundle = [
+    {signedTransaction: encodedSignedDepositTx},
+    {signedTransaction: encodedSignedArbTx}
+  ]
+  console.log(`Saving bundle to ${options.bundleFile}`)
+  await fs.writeFile(options.bundleFile, JSON.stringify(bundle))
+  return bundle
+}
+
+async function retrieveBundle() {
+  console.log(`Resuming with bundle from ${options.bundleFile}`)
+  return JSON.parse(await fs.readFile(options.bundleFile, 'utf-8'))
+}
 
 ;(async () => {
 
-const authSigner = ethers.Wallet.createRandom()
-
-const unsignedArbTx = await arbContract.populateTransaction.arb(options.uniFee, amountWei)
-unsignedArbTx.type = 2
-unsignedArbTx.chainId = signedDepositTx.chainId
-unsignedArbTx.nonce = signedDepositTx.nonce + 1
-unsignedArbTx.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas
-unsignedArbTx.maxFeePerGas = signedDepositTx.maxFeePerGas
-unsignedArbTx.gasLimit = parseInt(options.gasLimit)
-
-// sign randomly first to get around go-ethereum unmarshalling issue
-const fakeSigned = await authSigner.signTransaction(unsignedArbTx)
-cmd = options.daemon.concat(' api node sign ', fakeSigned.substring(2))
-const signOutput = JSON.parse(execSync(cmd))
-console.assert(signOutput.status === 'success', `signing arb transaction failed: ${signOutput.error}`)
-const encodedSignedArbTx = signOutput.signedData
-
-const bundle = [
-  {signedTransaction: encodedSignedDepositTx},
-  {signedTransaction: encodedSignedArbTx}
-]
-
-// TODO: save the bundle for resumption in case submission fails?
+const bundle = await (options.resume ? retrieveBundle() : makeBundle())
 
 const network = await provider.getNetwork()
 const flashbotsProvider = await flashbots.FlashbotsBundleProvider.create(
   provider,
-  authSigner,
+  randomSigner,
   network.chainId === 5 ? 'https://relay-goerli.flashbots.net/' : undefined,
   network.name)
 
@@ -115,12 +141,13 @@ const currentBlock = await provider.getBlock(currentBlockNumber)
 const currentBaseFeePerGas = currentBlock.baseFeePerGas
 
 if (options.dryRun) {
+  console.log(`Dry run only: using flashbots simulate on one block`)
   const targetBlockNumber = currentBlockNumber + 1
   console.log(`Target block number: ${targetBlockNumber}`)
   const signedBundle = await flashbotsProvider.signBundle(bundle)
   const simulation = await flashbotsProvider.simulate(signedBundle, targetBlockNumber)
   console.log(JSON.stringify(simulation, null, 2))
-  const bundlePricing = flashbotsProvider.calculateBundlePricing(simulation.results, currentbaseFeePerGas)
+  const bundlePricing = flashbotsProvider.calculateBundlePricing(simulation.results, currentBaseFeePerGas)
   console.log(JSON.stringify(bundlePricing, null, 2))
 }
 else {
@@ -178,34 +205,6 @@ if (failures.length) {
     console.log(JSON.stringify(conflictReport, null, 2))
   }
 }
-*/
-
-/*
-// for debugging interactively, add variables to the REPL context
-const repl = require('repl').start()
-repl.context.ethers = ethers
-repl.context.optins = options
-repl.context.encodedSignedDepositTx = encodedSignedDepositTx
-repl.context.signedDepositTx = signedDepositTx
-repl.context.provider = provider
-repl.context.arbContract = arbContract
-repl.context.unsignedArbTx = unsignedArbTx
-repl.context.fakeSigned = fakeSigned
-repl.context.signOutput = signOutput
-repl.context.encodedSignedArbTx = encodedSignedArbTx
-repl.context.network = network
-repl.context.authSigner = authSigner
-repl.context.flashbotsProvider = flashbotsProvider
-repl.context.currentBlockNumber = currentBlockNumber
-repl.context.currentBlock = currentBlock
-repl.context.currentBaseFeePerGas = currentBaseFeePerGas
-repl.context.maxTries = maxTries
-repl.context.maxBaseFeeInFutureBlock = maxBaseFeeInFutureBlock
-repl.context.bundle = bundle
-repl.context.targetBlockNumbers = targetBlockNumbers
-repl.context.promises = promises
-repl.context.submissions = submissions
-// repl.context.failures = failures
 */
 
 })()
