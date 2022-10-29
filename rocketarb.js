@@ -67,11 +67,12 @@ function getDepositTx() {
 async function getArbTx(encodedSignedDepositTx) {
   console.log('Creating arb transaction')
 
-  const arbAbi = ["function arb(uint24 uniswapFee, uint256 wethAmount) nonpayable"]
+  const arbAbi = ["function arb(uint24 uniswapFee, uint256 wethAmount, uint256 minProfit) nonpayable"]
   const arbContract = new ethers.Contract(options.arbContract, arbAbi, provider)
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
-  const unsignedArbTx = await arbContract.populateTransaction.arb(options.uniFee, amountWei)
+  //TODO: option to make minProfit at least a gas refund
+  const unsignedArbTx = await arbContract.populateTransaction.arb(options.uniFee, amountWei, 0)
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
   unsignedArbTx.nonce = signedDepositTx.nonce + 1

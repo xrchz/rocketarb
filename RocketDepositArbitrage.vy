@@ -105,8 +105,10 @@ def __default__():
 # Swap rETH for WETH on Uniswap (approve Uniswap to spend rETH, execute swap),
 # Return ETH profit to caller
 @external
-def arb(uniswapFee: uint24, wethAmount: uint256):
+def arb(uniswapFee: uint24, wethAmount: uint256, minProfit: uint256):
   assert wethToken.balanceOf(self) >= wethAmount, "not enough WETH, please fund()"
+
+  amountOutMinimum: uint256 = wethAmount + minProfit
 
   wethToken.withdraw(wethAmount)
 
@@ -132,13 +134,13 @@ def arb(uniswapFee: uint24, wethAmount: uint256):
     recipient: self,
     deadline: block.timestamp,
     amountIn: rethAmount,
-    amountOutMinimum: wethAmount,
+    amountOutMinimum: amountOutMinimum,
     sqrtPriceLimitX96: 0,
   })
 
   amountOut: uint256 = swapRouter.exactInputSingle(swapParams)
 
-  assert amountOut > wethAmount, "no profit"
+  assert amountOut >= amountOutMinimum, "not enough profit"
 
   profit: uint256 = amountOut - wethAmount
 
