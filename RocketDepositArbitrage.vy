@@ -20,21 +20,32 @@ interface WethInterface:
 interface RethInterface:
   def approve(_spender: address, _amount: uint256) -> bool: nonpayable
   def balanceOf(_who: address) -> uint256: view
+  def transfer(_to: address, _wad: uint256) -> bool: nonpayable
+
+interface RocketDepositArbitrageInterface:
+  def drain(): nonpayable
 
 rocketStorage: immutable(RocketStorageInterface)
 rethToken: immutable(RethInterface)
 wethToken: immutable(WethInterface)
 flashLender: immutable(FlashLoanInterface)
 swapRouter: immutable(address)
+owner: public(address)
 
 @external
 def __init__(flashLenderAddress: address, rocketStorageAddress: address, swapRouterAddress: address, wethAddress: address):
+  self.owner = msg.sender
   rocketStorage = RocketStorageInterface(rocketStorageAddress)
   rethAddress: address = rocketStorage.getAddress(keccak256("contract.addressrocketTokenRETH"))
   rethToken = RethInterface(rethAddress)
   wethToken = WethInterface(wethAddress)
   flashLender = FlashLoanInterface(flashLenderAddress)
   swapRouter = swapRouterAddress
+
+@external
+def setOwner(newOwner: address):
+  assert msg.sender == self.owner, "only owner can set owner"
+  self.owner = newOwner
 
 @external
 @payable
@@ -64,9 +75,21 @@ def onFlashLoan(initiator: address, token: address, amount: uint256, fee: uint25
 
 @external
 def arb(wethAmount: uint256, swapData: Bytes[MAX_DATA], minProfit: uint256):
-  assert wethToken.balanceOf(self) == 0, "unexpected held WETH"
+  RocketDepositArbitrageInterface(self).drain()
   assert flashLender.flashLoan(self, wethToken.address, wethAmount, swapData), "flash loan failed"
   profit: uint256 = wethToken.balanceOf(self)
   assert profit >= minProfit, "not enough profit"
   wethToken.withdraw(profit)
   send(msg.sender, profit)
+
+@external
+def drain():
+  rethBalance: uint256 = rethToken.balanceOf(self)
+  if 0 < rethBalance:
+    rethToken.transfer(self.owner, rethBalance)
+
+  wethBalance: uint256 = wethToken.balanceOf(self)
+  if 0 < wethBalance:
+    wethToken.withdraw(wethBalance)
+  if 0 < self.balance:
+    send(self.owner, self.balance)
