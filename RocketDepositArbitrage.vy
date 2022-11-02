@@ -74,7 +74,7 @@ def onFlashLoan(initiator: address, token: address, amount: uint256, fee: uint25
   return keccak256("ERC3156FlashBorrower.onFlashLoan")
 
 @external
-def arb(wethAmount: uint256, swapData: Bytes[MAX_DATA], minProfit: uint256):
+def arb(wethAmount: uint256, minProfit: uint256, swapData: Bytes[MAX_DATA]):
   RocketDepositArbitrageInterface(self).drain()
   assert flashLender.flashLoan(self, wethToken.address, wethAmount, swapData), "flash loan failed"
   profit: uint256 = wethToken.balanceOf(self)
