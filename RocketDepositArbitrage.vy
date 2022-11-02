@@ -1,6 +1,6 @@
 # @version ^0.3.7
 
-MAX_DATA: constant(uint256) = 320
+MAX_DATA: constant(uint256) = 2**13
 
 interface RocketStorageInterface:
   def getAddress(_key: bytes32) -> address: view
