@@ -1,12 +1,18 @@
 # @version ^0.3.7
 
+MAX_DATA: constant(uint256) = 320
+
 interface RocketStorageInterface:
   def getAddress(_key: bytes32) -> address: view
 
 interface RocketDepositPoolInterface:
   def deposit(): payable
 
+interface FlashLoanInterface:
+  def flashLoan(receiver: address, token: address, amount: uint256, data: Bytes[MAX_DATA]) -> bool: nonpayable
+
 interface WethInterface:
+  def approve(_spender: address, _amount: uint256) -> bool: nonpayable
   def balanceOf(_who: address) -> uint256: view
   def deposit(): payable
   def withdraw(_wad: uint256): nonpayable
@@ -14,138 +20,53 @@ interface WethInterface:
 interface RethInterface:
   def approve(_spender: address, _amount: uint256) -> bool: nonpayable
   def balanceOf(_who: address) -> uint256: view
-  def transfer(_to: address, _wad: uint256) -> bool: nonpayable
-
-struct ExactInputSingleParams:
-  tokenIn: address
-  tokenOut: address
-  fee: uint24
-  recipient: address
-  deadline: uint256
-  amountIn: uint256
-  amountOutMinimum: uint256
-  sqrtPriceLimitX96: uint160
-
-interface SwapRouter:
-  def exactInputSingle(params: ExactInputSingleParams) -> uint256: nonpayable
-
-event OwnerChange:
-  old: indexed(address)
-  new: indexed(address)
-
-event Fund:
-  who: indexed(address)
-  wad: uint256
-
-event Defund:
-  who: indexed(address)
-  weth: uint256
-  reth: uint256
-
-event Arbitrage:
-  who: indexed(address)
-  deposit: indexed(uint256)
-  profit: uint256
-
-owner: public(address)
 
 rocketStorage: immutable(RocketStorageInterface)
 rethToken: immutable(RethInterface)
 wethToken: immutable(WethInterface)
-swapRouter: immutable(SwapRouter)
+flashLender: immutable(FlashLoanInterface)
+swapRouter: immutable(address)
 
 @external
-def __init__(wethAddress: address, rocketStorageAddress: address, swapRouterAddress: address):
-  self.owner = msg.sender
+def __init__(flashLenderAddress: address, rocketStorageAddress: address, swapRouterAddress: address, wethAddress: address):
   rocketStorage = RocketStorageInterface(rocketStorageAddress)
   rethAddress: address = rocketStorage.getAddress(keccak256("contract.addressrocketTokenRETH"))
   rethToken = RethInterface(rethAddress)
   wethToken = WethInterface(wethAddress)
-  swapRouter = SwapRouter(swapRouterAddress)
-  log OwnerChange(empty(address), msg.sender)
-
-@external
-def setOwner(newOwner: address):
-  assert msg.sender == self.owner, "only owner can set owner"
-  self.owner = newOwner
-  log OwnerChange(msg.sender, self.owner)
-
-@external
-def defund():
-  assert msg.sender == self.owner, "only owner can defund"
-
-  wethBalance: uint256 = wethToken.balanceOf(self)
-  rethBalance: uint256 = rethToken.balanceOf(self)
-
-  if 0 < wethBalance:
-    wethToken.withdraw(wethBalance)
-
-  if 0 < rethBalance:
-    rethToken.transfer(self.owner, rethBalance)
-
-  if 0 < self.balance:
-    send(self.owner, self.balance)
-
-  log Defund(self.owner, wethBalance, rethBalance)
-
-@external
-@payable
-def fund():
-  fundAmount: uint256 = self.balance
-  wethToken.deposit(value = fundAmount)
-  log Fund(msg.sender, fundAmount)
+  flashLender = FlashLoanInterface(flashLenderAddress)
+  swapRouter = swapRouterAddress
 
 @external
 @payable
 def __default__():
-  assert msg.sender == wethToken.address, "only WETH can send ETH; use fund() instead"
+  assert msg.sender == wethToken.address, "only WETH can send ETH"
 
-# Require wethAmount WETH balance,
-# Mint rETH with Rocket Pool at protocol rate,
-# Swap rETH for WETH on Uniswap (approve Uniswap to spend rETH, execute swap),
-# Return ETH profit to caller
 @external
-def arb(uniswapFee: uint24, wethAmount: uint256, minProfit: uint256):
-  assert wethToken.balanceOf(self) >= wethAmount, "not enough WETH, please fund()"
+def onFlashLoan(initiator: address, token: address, amount: uint256, fee: uint256, data: Bytes[MAX_DATA]) -> bytes32:
+  assert initiator == self, "only I can initiate a flash loan"
+  assert token == wethToken.address, "only WETH can be flash loaned"
+  assert fee == 0, "no fee allowed"
 
-  amountOutMinimum: uint256 = wethAmount + minProfit
-
-  wethToken.withdraw(wethAmount)
+  wethToken.withdraw(amount)
 
   rocketDepositPool: RocketDepositPoolInterface = RocketDepositPoolInterface(
     rocketStorage.getAddress(keccak256("contract.addressrocketDepositPool")))
+  assert rethToken.balanceOf(self) == 0, "unexpected held rETH"
+  rocketDepositPool.deposit(value = amount)
 
-  rethBefore: uint256 = rethToken.balanceOf(self)
+  assert rethToken.approve(swapRouter, rethToken.balanceOf(self)), "rETH approve failed"
+  raw_call(swapRouter, data)
+  assert wethToken.balanceOf(self) >= amount, "not enough WETH after swap"
+  assert rethToken.balanceOf(self) == 0, "rETH left over after swap"
 
-  rocketDepositPool.deposit(value = wethAmount)
+  assert wethToken.approve(msg.sender, amount), "WETH approve failed"
+  return keccak256("ERC3156FlashBorrower.onFlashLoan")
 
-  rethAfter: uint256 = rethToken.balanceOf(self)
-
-  assert rethAfter >= rethBefore, "minted rETH missing"
-
-  rethAmount: uint256 = rethAfter - rethBefore
-
-  assert rethToken.approve(swapRouter.address, rethAmount), "rETH approve failed"
-
-  swapParams: ExactInputSingleParams = ExactInputSingleParams({
-    tokenIn: rethToken.address,
-    tokenOut: wethToken.address,
-    fee: uniswapFee,
-    recipient: self,
-    deadline: block.timestamp,
-    amountIn: rethAmount,
-    amountOutMinimum: amountOutMinimum,
-    sqrtPriceLimitX96: 0,
-  })
-
-  amountOut: uint256 = swapRouter.exactInputSingle(swapParams)
-
-  assert amountOut >= amountOutMinimum, "not enough profit"
-
-  profit: uint256 = amountOut - wethAmount
-
+@external
+def arb(wethAmount: uint256, swapData: Bytes[MAX_DATA], minProfit: uint256):
+  assert wethToken.balanceOf(self) == 0, "unexpected held WETH"
+  assert flashLender.flashLoan(self, wethToken.address, wethAmount, swapData), "flash loan failed"
+  profit: uint256 = wethToken.balanceOf(self)
+  assert profit >= minProfit, "not enough profit"
   wethToken.withdraw(profit)
-
   send(msg.sender, profit)
-
-  log Arbitrage(msg.sender, wethAmount, profit)
