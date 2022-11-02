@@ -1,2 +1,4 @@
 node_modules
 bundle.json
+.env
+wallet.json
