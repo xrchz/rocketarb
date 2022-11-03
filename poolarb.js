@@ -8,8 +8,6 @@ const https = require('https')
 const fs = require('fs/promises')
 
 program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
-       .option('-f, --max-fee <maxFee>', 'max transaction fee in gwei', '24')
-       .option('-i, --max-prio <maxPrio>', 'max transaction priority fee in gwei', '4')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the swap', '2')
        .option('-w, --wallet-file <file>', 'saved wallet for arbitrage transactions', 'wallet.json')
        .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', '5')
@@ -50,10 +48,6 @@ const rocketStorage = new ethers.Contract(
 const arbContract = new ethers.Contract(
   arbContractAddress, ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"], provider)
 
-const maxPriorityFeePerGas = ethers.utils.parseUnits(options.maxPrio, "gwei")
-const maxFeePerGas = ethers.utils.parseUnits(options.maxFee, "gwei")
-const gasLimit = parseInt(options.gasLimit)
-
 async function run() {
   const rocketNodeDepositAddress = await rocketStorage.getAddress(
     ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketNodeDeposit")))
@@ -64,15 +58,30 @@ async function run() {
   const rocketDepositSettingsAddress = await rocketStorage.getAddress(
     ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDAOProtocolSettingsDeposit")))
 
+  const rocketDepositPoolAddress = await rocketStorage.getAddress(
+    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDepositPool")))
+
   console.log(`Using rocketNodeDeposit address ${rocketNodeDepositAddress}`)
   console.log(`Using rETH address ${rethAddress}`)
+  console.log(`Using deposit pool address ${rocketDepositPoolAddress}`)
   console.log(`Using deposit settings address ${rocketDepositSettingsAddress}`)
 
   const rethContract = new ethers.Contract(
     rethAddress, ["function getRethValue(uint256 ethAmount) view returns (uint256)"], provider)
 
+  const rocketDepositPool = new ethers.Contract(
+    rocketDepositPoolAddress, ["function getBalance() view returns (uint256)"], provider)
+
   const depositSettings = new ethers.Contract(
-    rocketDepositSettingsAddress, ["function getDepositFee() view returns (uint256)"], provider)
+    rocketDepositSettingsAddress,
+    ["function getDepositFee() view returns (uint256)",
+     "function getMaximumDepositPoolSize() view returns (uint256)",
+     "function getMinimumDeposit() view returns (uint256)"],
+    provider)
+
+  const dpFee = await depositSettings.getDepositFee()
+  const dpSize = await depositSettings.getMaximumDepositPoolSize()
+  const minDeposit = await depositSettings.getMinimumDeposit()
 
   const rocketNodeDepositInterface = new ethers.utils.Interface(
     ["function deposit(uint256 _minimumNodeFee, bytes _validatorPubkey, bytes _validatorSignature, " +
@@ -88,6 +97,8 @@ async function run() {
     await fs.readFile(options.walletFile, {encoding: 'utf8'}),
     process.env.WALLET_PASSWORD)).connect(provider)
 
+  console.log(`Using wallet address: ${await signer.getAddress()}`)
+
   // TODO: replace if you want searcher reputation
   const randomSigner = ethers.Wallet.createRandom()
 
@@ -96,9 +107,9 @@ async function run() {
 
   const maxTries = parseInt(options.maxTries)
 
-  async function makeBundle(depositTx) {
-    const depositFee = depositTx.value.mul(await depositSettings.getDepositFee()).div(oneEther)
-    const depositAmount = depositTx.value.sub(depositFee)
+  async function makeArbTx(amount) {
+    const depositFee = amount.mul(dpFee).div(oneEther)
+    const depositAmount = amount.sub(depositFee)
     const rethAmount = await rethContract.getRethValue(depositAmount)
     console.log(`Aiming to arb ${ethers.utils.formatUnits(rethAmount, "ether")} rETH`)
 
@@ -114,15 +125,27 @@ async function run() {
     const swap = await oneInchAPI('swap', swapParams)
 
     // TODO: estimate the gas usage better
-    const arbGasUsageEstimate = ethers.BigNumber.from('600000')
-    const gasEstimate = maxFeePerGas.mul(arbGasUsageEstimate)
+    const arbGasUsageEstimate = ethers.BigNumber.from('800000')
+    const feeData = await provider.getFeeData()
+    // TODO: scale fee estimates up if necessary for priority
+    const gasEstimate = feeData.maxFeePerGas.mul(arbGasUsageEstimate)
+
+    if (ethers.utils.getAddress(swap.tx.to) !== '0x1111111254fb6c44bAC0beD2854e76F90643097d')
+      console.log(`Warning: unexpected to address for swap: ${swap.tx.to}`)
 
     const unsignedArbTx = await arbContract.populateTransaction.arb(
-      depositTx.value, gasEstimate, swap.tx.data)
-    unsignedArbTx.chainId = depositTx.chainId
+      amount, gasEstimate, swap.tx.data)
+    unsignedArbTx.chainId = 1
     unsignedArbTx.type = 2
-    unsignedArbTx.maxPriorityFeePerGas = maxPriorityFeePerGas
-    unsignedArbTx.maxFeePerGas = maxFeePerGas
+    unsignedArbTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas
+    unsignedArbTx.maxFeePerGas = feeData.maxFeePerGas
+    unsignedArbTx.gasLimit = arbGasUsageEstimate.mul(2)
+
+    return unsignedArbTx
+  }
+
+  async function makeBundle(depositTx) {
+    const unsignedArbTx = await makeArbTx(depositTx.value)
 
     // on rpc providers that do not provide the raw tx
     if (!('raw' in depositTx)) {
@@ -163,10 +186,18 @@ async function run() {
     if (simulateOnly === 1) {
       console.log('Submitting bundle as individual transactions')
       for (const tx of bundle) {
-        if ('signedTransaction' in tx)
-          await provider.sendTransaction(tx.signedTransaction)
-        else
-          await tx.signer.sendTransaction(tx.transaction)
+        try {
+          if ('signedTransaction' in tx)
+            // await provider.sendTransaction(tx.signedTransaction)
+            console.log('skipping signed tx, assuming already done')
+          else {
+            const txr = await tx.signer.sendTransaction(tx.transaction)
+            await txr.wait()
+          }
+        }
+        catch (e) {
+          console.log(`transaction failed: ${e.toString()}`)
+        }
       }
     }
     else if (simulateOnly === 2) {
@@ -224,6 +255,17 @@ async function run() {
         }
       }
       console.log(`Dropped ${dropped}, Skipped ${skipped}`)
+      const dpSpace = dpSize.sub(await rocketDepositPool.getBalance())
+      if (dpSpace.gt(minDeposit)) {
+        console.log(`Found ${dpSpace} free space in the DP: arbing immediately`)
+        const unsignedArbTx = makeArbTx(dpSpace)
+        const txr = await signer.sendTransaction(unsignedArbTx)
+        const receipt = await txr.wait()
+        if (receipt.status === 1)
+          console.log(`Done: ${receipt.transactionHash}`)
+        else
+          console.log(`Failed: ${receipt.keys().join(', ')}`)
+      }
     }
 
     let keepGoing = true
