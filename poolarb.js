@@ -146,28 +146,22 @@ async function run() {
   async function makeBundle(depositTx) {
     const unsignedArbTx = await makeArbTx(depositTx.value)
 
-    // on rpc providers that do not provide the raw tx
-    if (!('raw' in depositTx)) {
-      function getRawTransaction(tx) {
-        function addKey(acc, key) { if (key in tx) acc[key] = tx[key]; return acc }
-        const txFields = "accessList chainId data gasPrice gasLimit maxFeePerGas maxPriorityFeePerGas nonce to type value".split(" ")
-        const sigFields = "v r s".split(" ")
-        const raw = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
-        if (ethers.utils.keccak256(raw) !== tx.hash) throw new Error("serializing failed!")
-        return raw
-      }
-      if ('gasPrice' in depositTx && 'maxFeePerGas' in depositTx) {
-        console.log('Warning: depositTx contains both gasPrice and maxFeePerGas; deleting former')
-        delete depositTx.gasPrice
-      }
-      depositTx.raw = getRawTransaction(depositTx)
+    if ('gasPrice' in depositTx && 'maxFeePerGas' in depositTx) {
+      console.log('Warning: depositTx contains both gasPrice and maxFeePerGas; deleting former')
+      delete depositTx.gasPrice
     }
 
-    if (depositTx.raw instanceof Uint8Array)
-      depositTx.raw = `0x${Buffer.from(depositTx.raw).toString('hex')}`
+    function getRawTransaction(tx) {
+      function addKey(acc, key) { if (key in tx) acc[key] = tx[key]; return acc }
+      const txFields = "accessList chainId data gasPrice gasLimit maxFeePerGas maxPriorityFeePerGas nonce to type value".split(" ")
+      const sigFields = "v r s".split(" ")
+      const raw = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
+      if (ethers.utils.keccak256(raw) !== tx.hash) throw new Error("serializing failed!")
+      return raw
+    }
 
     return [
-      {signedTransaction: depositTx.raw},
+      {signedTransaction: getRawTransaction(depositTx)},
       {signer: signer, transaction: unsignedArbTx}
     ]
   }
