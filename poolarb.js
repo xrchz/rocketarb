@@ -11,7 +11,6 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the swap', '2')
        .option('-w, --wallet-file <file>', 'saved wallet for arbitrage transactions', 'wallet.json')
        .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', '5')
-       .requiredOption('-b, --arb-contract <addr>', 'arb contract address')
 program.parse()
 const options = program.opts()
 
@@ -21,7 +20,7 @@ const provider = new ethers.providers.JsonRpcProvider(options.rpc)
 
 const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
 const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
-const arbContractAddress = options.arbContract // TODO: hardcode once deployed
+const arbContractAddress = '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571'
 const oneInchAPIBase = 'https://api.1inch.io/v4.0/1/'
 
 function oneInchAPI(method, params) {
