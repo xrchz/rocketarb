@@ -258,8 +258,10 @@ async function run() {
       if (dpSpace.gt(minDeposit)) {
         console.log(`Found ${dpSpace} free space in the DP: arbing immediately`)
         const unsignedArbTx = makeArbTx(dpSpace)
-        const txr = await signer.sendTransaction(unsignedArbTx)
-        const receipt = await txr.wait()
+        const txr = await flashbotsProvider.sendPrivateTransaction({
+          transaction: unsignedArbTx, signer: signer})
+        await txr.wait()
+        const receipt = await txr.receipts()[0]
         if (receipt.status === 1)
           console.log(`Done: ${receipt.transactionHash}`)
         else
