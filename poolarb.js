@@ -163,6 +163,9 @@ async function run() {
       depositTx.raw = getRawTransaction(depositTx)
     }
 
+    if (depositTx.raw instanceof Uint8Array)
+      depositTx.raw = `0x${Buffer.from(depositTx.raw).toString('hex')}`
+
     return [
       {signedTransaction: depositTx.raw},
       {signer: signer, transaction: unsignedArbTx}
