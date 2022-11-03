@@ -2,6 +2,7 @@
 
 const { execSync } = require('child_process')
 const { program } = require('commander')
+const https = require('https')
 const ethers = require('ethers')
 const flashbots = require('@flashbots/ethers-provider-bundle')
 const prompt = require('prompt-sync')()
@@ -20,8 +21,9 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
        .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
        .option('-u, --uni-fee <bps>', 'Uniswap fee to select the rETH/WETH pool to use (500 means the 0.05% fee pool)', 500)
-       .option('-g, --gas-limit <gas>', 'gas limit for arbitrage transaction', 400000)
-       .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0xTODO-DEPLOYMENT-ADDRESS')
+       .option('-g, --gas-limit <gas>', 'gas limit for arbitrage transaction', 800000)
+       .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0x7e593f081244F6442DC3B51b768c695dE8f8e997')
+       .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
 program.parse()
 const options = program.opts()
 
@@ -64,15 +66,63 @@ function getDepositTx() {
   return encodedSignedDepositTx
 }
 
+async function getSwapData(amount) {
+  const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+  const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
+  const rocketStorage = new ethers.Contract(
+    rocketStorageAddress, ["function getAddress(bytes32 key) view returns (address)"], provider)
+  const rethAddress = await rocketStorage.getAddress(
+    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketTokenRETH")))
+  const rethContract = new ethers.Contract(
+    rethAddress, ["function getRethValue(uint256 ethAmount) view returns (uint256)"], provider)
+  const rocketDepositSettingsAddress = await rocketStorage.getAddress(
+    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDAOProtocolSettingsDeposit")))
+  const depositSettings = new ethers.Contract(
+    rocketDepositSettingsAddress, ["function getDepositFee() view returns (uint256)"], provider)
+  const dpFee = await depositSettings.getDepositFee()
+  const depositFee = amount.mul(dpFee).div(oneEther)
+  const depositAmount = amount.sub(depositFee)
+  const rethAmount = await rethContract.getRethValue(depositAmount)
+  const swapParams = new URLSearchParams({
+    fromTokenAddress: rethAddress,
+    toTokenAddress: wethAddress,
+    fromAddress: options.arbContract,
+    amount: rethAmount,
+    slippage: options.slippage,
+    allowPartialFill: false,
+    disableEstimate: true
+  }).toString()
+  const url = `https://api.1inch.io/v4.0/1/swap?${swapParams}`
+  const apiCall = new Promise((resolve, reject) => {
+    const req = https.get(url,
+      (res) => {
+        if (res.statusCode !== 200) {
+          console.log(`Got ${res.statusCode} from 1inch`)
+          reject(res)
+        }
+        res.setEncoding('utf8')
+        let data = ''
+        res.on('data', (chunk) => data += chunk)
+        res.on('end', () => resolve(JSON.parse(data)))
+      })
+    req.on('error', reject)
+  })
+  const swap = await apiCall
+  if (ethers.utils.getAddress(swap.tx.to) !== '0x1111111254fb6c44bAC0beD2854e76F90643097d')
+    console.log(`Warning: unexpected to address for swap: ${swap.tx.to}`)
+  return swap.tx.data
+}
+
 async function getArbTx(encodedSignedDepositTx) {
   console.log('Creating arb transaction')
 
-  const arbAbi = ["function arb(uint24 uniswapFee, uint256 wethAmount, uint256 minProfit) nonpayable"]
+  const arbAbi = ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"]
   const arbContract = new ethers.Contract(options.arbContract, arbAbi, provider)
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
-  //TODO: option to make minProfit at least a gas refund
-  const unsignedArbTx = await arbContract.populateTransaction.arb(options.uniFee, amountWei, 0)
+  const swapData = getSwapData(signedDepositTx.value)
+  //TODO: make minProfit at least a gas refund
+  const unsignedArbTx = await arbContract.populateTransaction.arb(amountWei, 0, swapData)
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
   unsignedArbTx.nonce = signedDepositTx.nonce + 1
