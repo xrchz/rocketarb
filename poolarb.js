@@ -115,7 +115,7 @@ async function run() {
     const swapParams = {
       fromTokenAddress: rethAddress,
       toTokenAddress: wethAddress,
-      fromAddress: await signer.getAddress(),
+      fromAddress: arbContractAddress,
       amount: rethAmount,
       slippage: options.slippage,
       allowPartialFill: false,
