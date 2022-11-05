@@ -235,27 +235,27 @@ async function run() {
           console.log(`RelayResponseError ${JSON.stringify(submission)}`)
         }
         else {
-	  const simulateRes = await submission.simulate()
-	  if ('error' in simulateRes) {
-	    console.log(`Error during simulation, aborting: ${simulateRes.error.message}`)
-	  }
-	  else {
-	    console.log(`Simulation used ${simulateRes.totalGasUsed} gas @ ${simulateRes.results[0].gasPrice}`)
-	    if ('firstRevert' in simulateRes) {
-	      console.log(`Revert during simulation, aborting: ${simulateRes.firstRevert.revert}`)
-	      if (!('revert' in simulateRes.firstRevert))
-		console.log(JSON.stringify(simulateRes.firstRevert))
-	    }
-	    else {
-	      console.log('Simulation succeeded, waiting for submission')
-	      const resolution = await submission.wait()
-	      console.log(`Resolution: ${flashbots.FlashbotsBundleResolution[resolution]}`)
-	      if (resolution === flashbots.FlashbotsBundleResolution.BundleIncluded) {
-		console.log('Success!')
-		break
-	      }
-	    }
-	  }
+          const simulateRes = await submission.simulate()
+          if ('error' in simulateRes) {
+            console.log(`Error during simulation, aborting: ${simulateRes.error.message}`)
+          }
+          else {
+            console.log(`Simulation used ${simulateRes.totalGasUsed} gas @ ${simulateRes.results[0].gasPrice}`)
+            if ('firstRevert' in simulateRes) {
+              console.log(`Revert during simulation, aborting: ${simulateRes.firstRevert.revert}`)
+              if (!('revert' in simulateRes.firstRevert))
+                console.log(JSON.stringify(simulateRes.firstRevert))
+            }
+            else {
+              console.log('Simulation succeeded, waiting for submission')
+              const resolution = await submission.wait()
+              console.log(`Resolution: ${flashbots.FlashbotsBundleResolution[resolution]}`)
+              if (resolution === flashbots.FlashbotsBundleResolution.BundleIncluded) {
+                console.log('Success!')
+                break
+              }
+            }
+          }
         }
       }
     }
@@ -275,22 +275,22 @@ async function run() {
       let dropped = 0
       let skipped = 0
       for (const hash of hashes) {
-	const tx = await provider.getTransaction(hash)
-	if (tx === null) dropped += 1
-	else if (
+        const tx = await provider.getTransaction(hash)
+        if (tx === null) dropped += 1
+        else if (
           tx.to === rocketNodeDepositAddress &&
           can(rocketNodeDepositInterface.parseTransaction, tx)
         ) {
           console.log(`Found ${hash}: a minipool deposit!`)
           await processTx(tx, tx.value, false)
-	}
+        }
         else if (
           tx.to === rethAddress &&
           can(rethBurnInterface.parseTransaction, tx)
         ) {
-	  console.log(`Found ${hash}: an rETH burn!`)
-	  const rethAmount = canResult.args[0]
-	  const rethContractBalance = await provider.getBalance(rethContract.address)
+          console.log(`Found ${hash}: an rETH burn!`)
+          const rethAmount = canResult.args[0]
+          const rethContractBalance = await provider.getBalance(rethContract.address)
           if (rethContractBalance.geq(rethAmount)) {
             console.log('But it will not free any DP space')
             skipped += 1
@@ -301,81 +301,81 @@ async function run() {
           await processTx(tx, dpSpace)
         }
         else {
-	  skipped += 1
+          skipped += 1
         }
       }
       console.log(`Dropped ${dropped}, Skipped ${skipped}`)
       if (dpSkips > 0) {
-	console.log(`(skipping dp check ${dpSkips})`)
-	dpSkips--
-	return
+        console.log(`(skipping dp check ${dpSkips})`)
+        dpSkips--
+        return
       }
       const dpSpace = dpSize.sub(await rocketDepositPool.getBalance())
       if (dpSpace.gt(dpArbMin)) {
         console.log(`Found ${ethers.utils.formatUnits(dpSpace, 'ether')} free space in the DP: arbing immediately`)
         const unsignedArbTx = await makeArbTx(dpSpace)
-	console.log('Made tx')
-	const maxBlockNumber = await provider.getBlockNumber() + maxTries
-	console.log(`Will submit up till ${maxBlockNumber}`)
-	const txr = await flashbotsProvider.sendPrivateTransaction(
-	  {transaction: unsignedArbTx, signer: signer},
-	  {maxBlockNumber:  maxBlockNumber})
-	console.log('Sent request to flashbots, now simulating')
-	const simulateRes = await txr.simulate()
-	const sentTx = ethers.utils.parseTransaction(txr.transaction.signedTransaction)
-	console.log(`Got simulation result based on gasLimit ${sentTx.gasLimit} maxFee ${sentTx.maxFeePerGas}`)
-	if ('error' in simulateRes) {
-	  console.log(`Error during simulation, aborting: ${simulateRes.error.message}`)
-	  // const msgWords = simulateRes.error.message.split(' ')
-	  // const txhash = msgWords.pop()
-	  // const checkWord = msgWords.pop()
-	  // if (checkWord === 'txhash') {
-	  //   console.log(`Cancelling ${txhash}`)
-	  //   try {
-	  //     await flashbotsProvider.cancelPrivateTransaction(txhash)
-	  //   }
-	  //   catch (e) {
-	  //     console.log(`Cancel failed: ${e.toString()}`)
-	  //   }
-	  // }
-	  dpSkips = skipsOnError
-	}
-	else {
-	  console.log(`Simulation used ${simulateRes.totalGasUsed} gas @ ${simulateRes.results[0].gasPrice}`)
-	  if ('firstRevert' in simulateRes) {
-	    console.log(`Revert during simulation, aborting: ${simulateRes.firstRevert.revert}`)
-	    if (!('revert' in simulateRes.firstRevert))
-	      console.log(JSON.stringify(simulateRes.firstRevert))
-	    dpSkips = skipsOnRevert
-	  }
-	  else {
-	    console.log('Simulation succeeded, waiting for submission')
-	    const waitRes = await txr.wait()
-	    if (waitRes === flashbots.FlashbotsTransactionResolution.TransactionIncluded) {
-	      console.log('Success!')
-	    }
-	    else if (waitRes === flashbots.FlashbotsTransactionResolution.TransactionDropped) {
-	      console.log('Failed to send flashbots transaction')
-	      dpSkips = skipsOnError
-	    }
-	    else {
-	      console.log(`Something else happened ${waitRes}`)
-	      dpSkips = skipsOnError
-	    }
-	  }
-	}
+        console.log('Made tx')
+        const maxBlockNumber = await provider.getBlockNumber() + maxTries
+        console.log(`Will submit up till ${maxBlockNumber}`)
+        const txr = await flashbotsProvider.sendPrivateTransaction(
+          {transaction: unsignedArbTx, signer: signer},
+          {maxBlockNumber:  maxBlockNumber})
+        console.log('Sent request to flashbots, now simulating')
+        const simulateRes = await txr.simulate()
+        const sentTx = ethers.utils.parseTransaction(txr.transaction.signedTransaction)
+        console.log(`Got simulation result based on gasLimit ${sentTx.gasLimit} maxFee ${sentTx.maxFeePerGas}`)
+        if ('error' in simulateRes) {
+          console.log(`Error during simulation, aborting: ${simulateRes.error.message}`)
+          // const msgWords = simulateRes.error.message.split(' ')
+          // const txhash = msgWords.pop()
+          // const checkWord = msgWords.pop()
+          // if (checkWord === 'txhash') {
+          //   console.log(`Cancelling ${txhash}`)
+          //   try {
+          //     await flashbotsProvider.cancelPrivateTransaction(txhash)
+          //   }
+          //   catch (e) {
+          //     console.log(`Cancel failed: ${e.toString()}`)
+          //   }
+          // }
+          dpSkips = skipsOnError
+        }
+        else {
+          console.log(`Simulation used ${simulateRes.totalGasUsed} gas @ ${simulateRes.results[0].gasPrice}`)
+          if ('firstRevert' in simulateRes) {
+            console.log(`Revert during simulation, aborting: ${simulateRes.firstRevert.revert}`)
+            if (!('revert' in simulateRes.firstRevert))
+              console.log(JSON.stringify(simulateRes.firstRevert))
+            dpSkips = skipsOnRevert
+          }
+          else {
+            console.log('Simulation succeeded, waiting for submission')
+            const waitRes = await txr.wait()
+            if (waitRes === flashbots.FlashbotsTransactionResolution.TransactionIncluded) {
+              console.log('Success!')
+            }
+            else if (waitRes === flashbots.FlashbotsTransactionResolution.TransactionDropped) {
+              console.log('Failed to send flashbots transaction')
+              dpSkips = skipsOnError
+            }
+            else {
+              console.log(`Something else happened ${waitRes}`)
+              dpSkips = skipsOnError
+            }
+          }
+        }
       }
     }
 
     let keepGoing = true
     process.on('SIGINT', () => {
       if (keepGoing) {
-	console.log('Got interrupt')
-	keepGoing = false
+        console.log('Got interrupt')
+        keepGoing = false
       }
       else {
-	console.log(`Got another interrupt: leaving ${filterId} installed and exiting now`)
-	process.exit()
+        console.log(`Got another interrupt: leaving ${filterId} installed and exiting now`)
+        process.exit()
       }
     })
     while (keepGoing)
