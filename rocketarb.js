@@ -203,12 +203,6 @@ if (options.dryRun) {
 }
 else {
   const maxTries = parseInt(options.maxTries)
-  const maxBaseFeeInFutureBlock = flashbots.FlashbotsBundleProvider.getMaxBaseFeeInFutureBlock(
-    currentBaseFeePerGas, maxTries)
-
-  console.assert(signedDepositTx.maxFeePerGas.gte(maxBaseFeeInFutureBlock),
-    `gas price too low: max predicted base fee is ${ethers.utils.formatUnits(maxBaseFeeInFutureBlock, 'gwei')} gwei`)
-
   const targetBlockNumbers = []
   const promises = []
   for (let targetBlockNumber = currentBlockNumber + 1; targetBlockNumber <= currentBlockNumber + maxTries; targetBlockNumber++) {
