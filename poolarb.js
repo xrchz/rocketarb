@@ -289,7 +289,7 @@ async function run() {
           console.log(`Found ${hash}: an rETH burn!`)
           const rethAmount = canResult.args[0]
           const rethContractBalance = await provider.getBalance(rethContract.address)
-          if (rethContractBalance.geq(rethAmount)) {
+          if (rethContractBalance.gte(rethAmount)) {
             console.log('But it will not free any DP space')
             skipped += 1
             continue
