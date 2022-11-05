@@ -178,14 +178,12 @@ async function run() {
   }
 
   let canResult
-  function can(f, a) {
+  function canParse(iface, tx) {
     try {
-      canResult = f(a)
+      canResult = iface.parseTransaction(tx)
       return true
     }
-    catch {
-      return false
-    }
+    catch { return false }
   }
 
   async function processTx(tx, value) {
@@ -279,14 +277,14 @@ async function run() {
         if (tx === null) dropped += 1
         else if (
           tx.to === rocketNodeDepositAddress &&
-          can(rocketNodeDepositInterface.parseTransaction, tx)
+          canParse(rocketNodeDepositInterface, tx)
         ) {
           console.log(`Found ${hash}: a minipool deposit!`)
           await processTx(tx, tx.value, false)
         }
         else if (
           tx.to === rethAddress &&
-          can(rethBurnInterface.parseTransaction, tx)
+          canParse(rethBurnInterface, tx)
         ) {
           console.log(`Found ${hash}: an rETH burn!`)
           const rethAmount = canResult.args[0]
