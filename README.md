@@ -8,11 +8,12 @@ any problems!
 
 1. Dry run creating the minipool the normal way with the Rocketpool smartnode
    (>= 1.7.0). Stop before the final `ARE YOU SURE...` prompt and cancel it.
-2. Install the requirements on your node machine: `nodejs` (>= 18), `npm`, and
-   clone this repo (`rocketarb`).
-3. Ensure your node's RPC port is exposed locally as described
+2. Ensure your node's RPC port is exposed locally as described
    [here](https://docs.rocketpool.net/guides/node/advanced-config.html#execution-client).
-4. Run `./rocketarb.js`. It should be fine with no arguments. Pass the `--help`
+3. Install the requirements on your node machine: `nodejs` (>= 18), and `npm`.
+4. Clone this repo (`git clone https://github.com/xrchz/rocketarb`), `cd
+   rocketarb`, and `npm install` to download the js dependencies.
+5. Run `./rocketarb.js`. It should be fine with no arguments. Pass the `--help`
    to see more options if something goes wrong.
 
 ## What does it do?
