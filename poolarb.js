@@ -294,7 +294,8 @@ async function run() {
             skipped += 1
             continue
           }
-          const dpSpace = dpSize.sub(await rocketDepositPool.getBalance()).sub(
+          // know: rethContractBalance < rethAmount
+          const dpSpace = dpSize.sub(await rocketDepositPool.getBalance()).add(
             rethAmount.sub(rethContractBalance))
           await processTx(tx, dpSpace)
         }
