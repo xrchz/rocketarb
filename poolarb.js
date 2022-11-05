@@ -87,6 +87,9 @@ async function run() {
     ["function deposit(uint256 _minimumNodeFee, bytes _validatorPubkey, bytes _validatorSignature, " +
       "bytes32 _depositDataRoot, uint256 _salt, address _expectedMinipoolAddress) payable"])
 
+  const rethBurnInterface = new ethers.utils.Interface(
+    ["function burn(uint256 _rethAmount) nonpayable"])
+
   const network = await provider.getNetwork()
   if (network.chainId !== 1) {
     console.log(`Only works on Ethereum mainnet (got chainid ${network.chainId})`)
@@ -151,12 +154,12 @@ async function run() {
     return unsignedArbTx
   }
 
-  async function makeBundle(depositTx) {
-    const unsignedArbTx = await makeArbTx(depositTx.value)
+  async function makeBundle(tx, value) {
+    const unsignedArbTx = await makeArbTx(value)
 
-    if ('gasPrice' in depositTx && 'maxFeePerGas' in depositTx) {
-      console.log('Warning: depositTx contains both gasPrice and maxFeePerGas; deleting former')
-      delete depositTx.gasPrice
+    if ('gasPrice' in tx && 'maxFeePerGas' in tx) {
+      console.log('Warning: tx contains both gasPrice and maxFeePerGas; deleting former')
+      delete tx.gasPrice
     }
 
     function getRawTransaction(tx) {
@@ -169,21 +172,24 @@ async function run() {
     }
 
     return [
-      {signedTransaction: getRawTransaction(depositTx)},
+      {signedTransaction: getRawTransaction(tx)},
       {signer: signer, transaction: unsignedArbTx}
     ]
   }
 
-  async function processDepositTx(depositTx) {
+  let canResult
+  function can(f, a) {
     try {
-      rocketNodeDepositInterface.parseTransaction(depositTx)
+      canResult = f(a)
+      return true
     }
     catch {
-      console.log('but could not parse it as a deposit()')
-      return
+      return false
     }
+  }
 
-    const bundle = await makeBundle(depositTx)
+  async function processTx(tx, value) {
+    const bundle = await makeBundle(tx, value)
     const currentBlockNumber = await provider.getBlockNumber()
     const simulateOnly = 0
 
@@ -229,12 +235,27 @@ async function run() {
           console.log(`RelayResponseError ${JSON.stringify(submission)}`)
         }
         else {
-          const resolution = await submission.wait()
-          console.log(`Resolution: ${flashbots.FlashbotsBundleResolution[resolution]}`)
-          if (resolution === flashbots.FlashbotsBundleResolution.BundleIncluded) {
-            console.log('Success!')
-            break
-          }
+	  const simulateRes = await submission.simulate()
+	  if ('error' in simulateRes) {
+	    console.log(`Error during simulation, aborting: ${simulateRes.error.message}`)
+	  }
+	  else {
+	    console.log(`Simulation used ${simulateRes.totalGasUsed} gas @ ${simulateRes.results[0].gasPrice}`)
+	    if ('firstRevert' in simulateRes) {
+	      console.log(`Revert during simulation, aborting: ${simulateRes.firstRevert.revert}`)
+	      if (!('revert' in simulateRes.firstRevert))
+		console.log(JSON.stringify(simulateRes.firstRevert))
+	    }
+	    else {
+	      console.log('Simulation succeeded, waiting for submission')
+	      const resolution = await submission.wait()
+	      console.log(`Resolution: ${flashbots.FlashbotsBundleResolution[resolution]}`)
+	      if (resolution === flashbots.FlashbotsBundleResolution.BundleIncluded) {
+		console.log('Success!')
+		break
+	      }
+	    }
+	  }
         }
       }
     }
@@ -254,12 +275,33 @@ async function run() {
       let dropped = 0
       let skipped = 0
       for (const hash of hashes) {
-        const tx = await provider.getTransaction(hash)
-        if (tx === null) dropped += 1
-        else if (tx.to !== rocketNodeDepositAddress) skipped += 1
+	const tx = await provider.getTransaction(hash)
+	if (tx === null) dropped += 1
+	else if (
+          tx.to === rocketNodeDepositAddress &&
+          can(rocketNodeDepositInterface.parseTransaction, tx)
+        ) {
+          console.log(`Found ${hash}: a minipool deposit!`)
+          await processTx(tx, tx.value, false)
+	}
+        else if (
+          tx.to === rethAddress &&
+          can(rethBurnInterface.parseTransaction, tx)
+        ) {
+	  console.log(`Found ${hash}: an rETH burn!`)
+	  const rethAmount = canResult.args[0]
+	  const rethContractBalance = await provider.getBalance(rethContract.address)
+          if (rethContractBalance.geq(rethAmount)) {
+            console.log('But it will not free any DP space')
+            skipped += 1
+            continue
+          }
+          const dpSpace = dpSize.sub(await rocketDepositPool.getBalance()).sub(
+            rethAmount.sub(rethContractBalance))
+          await processTx(tx, dpSpace)
+        }
         else {
-          console.log(`Found ${hash} to deposit contract!`)
-          await processDepositTx(tx)
+	  skipped += 1
         }
       }
       console.log(`Dropped ${dropped}, Skipped ${skipped}`)
