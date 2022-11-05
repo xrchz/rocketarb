@@ -10,7 +10,7 @@ const fs = require('fs/promises')
 program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the swap', '2')
        .option('-w, --wallet-file <file>', 'saved wallet for arbitrage transactions', 'wallet.json')
-       .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', '5')
+       .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', '3')
 program.parse()
 const options = program.opts()
 
