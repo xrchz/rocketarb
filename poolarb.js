@@ -274,7 +274,16 @@ async function run() {
     }
 
     let keepGoing = true
-    process.on('SIGINT', () => { keepGoing = false })
+    process.on('SIGINT', () => {
+      if (keepGoing) {
+	console.log('Got interrupt')
+	keepGoing = false
+      }
+      else {
+	console.log(`Got another interrupt: leaving ${filterId} installed and exiting now`)
+	process.exit()
+      }
+    })
     while (keepGoing)
       await new Promise(resolve => setTimeout(resolve, 1000)).then(pollForTxs)
     return filterId
