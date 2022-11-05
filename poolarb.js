@@ -81,6 +81,7 @@ async function run() {
   const dpFee = await depositSettings.getDepositFee()
   const dpSize = await depositSettings.getMaximumDepositPoolSize()
   const minDeposit = await depositSettings.getMinimumDeposit()
+  const dpArbMin = minDeposit.mul(100) // TODO: tune
 
   const rocketNodeDepositInterface = new ethers.utils.Interface(
     ["function deposit(uint256 _minimumNodeFee, bytes _validatorPubkey, bytes _validatorSignature, " +
@@ -243,6 +244,10 @@ async function run() {
     const filterId = await provider.send("eth_newPendingTransactionFilter", [])
     console.log(`installed pending tx filter ${filterId}`)
 
+    const skipsOnError = maxTries * 12
+    const skipsOnRevert = 16
+    var dpSkips = 0
+
     async function pollForTxs() {
       const hashes = await provider.send("eth_getFilterChanges", [filterId])
       console.log(`Got ${hashes.length} pending txs`)
@@ -258,18 +263,65 @@ async function run() {
         }
       }
       console.log(`Dropped ${dropped}, Skipped ${skipped}`)
+      if (dpSkips > 0) {
+	console.log(`(skipping dp check ${dpSkips})`)
+	dpSkips--
+	return
+      }
       const dpSpace = dpSize.sub(await rocketDepositPool.getBalance())
-      if (dpSpace.gt(minDeposit)) {
-        console.log(`Found ${dpSpace} free space in the DP: arbing immediately`)
-        const unsignedArbTx = makeArbTx(dpSpace)
-        const txr = await flashbotsProvider.sendPrivateTransaction({
-          transaction: unsignedArbTx, signer: signer})
-        await txr.wait()
-        const receipt = await txr.receipts()[0]
-        if (receipt.status === 1)
-          console.log(`Done: ${receipt.transactionHash}`)
-        else
-          console.log(`Failed: ${receipt.keys().join(', ')}`)
+      if (dpSpace.gt(dpArbMin)) {
+        console.log(`Found ${ethers.utils.formatUnits(dpSpace, 'ether')} free space in the DP: arbing immediately`)
+        const unsignedArbTx = await makeArbTx(dpSpace)
+	console.log('Made tx')
+	const maxBlockNumber = await provider.getBlockNumber() + maxTries
+	console.log(`Will submit up till ${maxBlockNumber}`)
+	const txr = await flashbotsProvider.sendPrivateTransaction(
+	  {transaction: unsignedArbTx, signer: signer},
+	  {maxBlockNumber:  maxBlockNumber})
+	console.log('Sent request to flashbots, now simulating')
+	const simulateRes = await txr.simulate()
+	const sentTx = ethers.utils.parseTransaction(txr.transaction.signedTransaction)
+	console.log(`Got simulation result based on gasLimit ${sentTx.gasLimit} maxFee ${sentTx.maxFeePerGas}`)
+	if ('error' in simulateRes) {
+	  console.log(`Error during simulation, aborting: ${simulateRes.error.message}`)
+	  // const msgWords = simulateRes.error.message.split(' ')
+	  // const txhash = msgWords.pop()
+	  // const checkWord = msgWords.pop()
+	  // if (checkWord === 'txhash') {
+	  //   console.log(`Cancelling ${txhash}`)
+	  //   try {
+	  //     await flashbotsProvider.cancelPrivateTransaction(txhash)
+	  //   }
+	  //   catch (e) {
+	  //     console.log(`Cancel failed: ${e.toString()}`)
+	  //   }
+	  // }
+	  dpSkips = skipsOnError
+	}
+	else {
+	  console.log(`Simulation used ${simulateRes.totalGasUsed} gas @ ${simulateRes.results[0].gasPrice}`)
+	  if ('firstRevert' in simulateRes) {
+	    console.log(`Revert during simulation, aborting: ${simulateRes.firstRevert.revert}`)
+	    if (!('revert' in simulateRes.firstRevert))
+	      console.log(JSON.stringify(simulateRes.firstRevert))
+	    dpSkips = skipsOnRevert
+	  }
+	  else {
+	    console.log('Simulation succeeded, waiting for submission')
+	    const waitRes = await txr.wait()
+	    if (waitRes === flashbots.FlashbotsTransactionResolution.TransactionIncluded) {
+	      console.log('Success!')
+	    }
+	    else if (waitRes === flashbots.FlashbotsTransactionResolution.TransactionDropped) {
+	      console.log('Failed to send flashbots transaction')
+	      dpSkips = skipsOnError
+	    }
+	    else {
+	      console.log(`Something else happened ${waitRes}`)
+	      dpSkips = skipsOnError
+	    }
+	  }
+	}
       }
     }
 
