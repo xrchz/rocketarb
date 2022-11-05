@@ -342,9 +342,10 @@ async function run() {
         else {
           console.log(`Simulation used ${simulateRes.totalGasUsed} gas @ ${simulateRes.results[0].gasPrice}`)
           if ('firstRevert' in simulateRes) {
-            console.log(`Revert during simulation, aborting: ${simulateRes.firstRevert.revert}`)
             if (!('revert' in simulateRes.firstRevert))
               console.log(JSON.stringify(simulateRes.firstRevert))
+            else
+              console.log(`Revert during simulation, aborting: ${simulateRes.firstRevert.revert}`)
             dpSkips = skipsOnRevert
           }
           else {
