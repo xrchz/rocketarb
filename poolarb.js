@@ -106,11 +106,12 @@ async function run() {
 
   const maxTries = parseInt(options.maxTries)
 
-  async function makeArbTx(amount) {
-    const depositFee = amount.mul(dpFee).div(oneEther)
-    const depositAmount = amount.sub(depositFee)
-    const rethAmount = await rethContract.getRethValue(depositAmount)
-    console.log(`Aiming to arb ${ethers.utils.formatUnits(rethAmount, "ether")} rETH`)
+  async function makeArbTx(ethAmount) {
+    const depositFee = ethAmount.mul(dpFee).div(oneEther)
+    const depositAmount = ethAmount.sub(depositFee)
+    const rethAmount = rethContract.getRethValue(depositAmount)
+
+    console.log(`Aiming to arb ${ethers.utils.formatUnits(ethAmount, "ether")} ETH via ${ethers.utils.formatUnits(rethAmount, "ether")} rETH`)
 
     const swapParams = {
       fromTokenAddress: rethAddress,
@@ -123,22 +124,28 @@ async function run() {
     }
     const swap = await oneInchAPI('swap', swapParams)
 
-    // TODO: estimate the gas usage better
-    const arbGasUsageEstimate = ethers.BigNumber.from('800000')
     const feeData = await provider.getFeeData()
-    // TODO: scale fee estimates up if necessary for priority
-    const gasEstimate = feeData.maxFeePerGas.mul(arbGasUsageEstimate)
+    if (!('maxFeePerGas' in feeData) || ethers.BigNumber.from(0).eq(feeData.maxFeePerGas)) {
+      console.log(`Warning: did not get gas estimate, got ${feeData.maxFeePerGas}, using default 16/2 (-> 24/4)`)
+      feeData.maxFeePerGas = ethers.BigNumber.from(16)
+      feeData.maxPriorityFeePerGas = ethers.BigNumber.from(2)
+    }
+
+    // TODO: estimate the gas usage better somehow?
+    const arbMaxGas = ethers.BigNumber.from('900000')
+    const minProfit = feeData.maxFeePerGas.mul(arbMaxGas)
 
     if (ethers.utils.getAddress(swap.tx.to) !== '0x1111111254fb6c44bAC0beD2854e76F90643097d')
       console.log(`Warning: unexpected to address for swap: ${swap.tx.to}`)
 
+    console.log(`arb(${ethAmount}, ${minProfit}, ${swap.tx.data})`)
     const unsignedArbTx = await arbContract.populateTransaction.arb(
-      amount, gasEstimate, swap.tx.data)
+      ethAmount, minProfit, swap.tx.data)
     unsignedArbTx.chainId = 1
     unsignedArbTx.type = 2
-    unsignedArbTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas
+    unsignedArbTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas.mul(2)
     unsignedArbTx.maxFeePerGas = feeData.maxFeePerGas
-    unsignedArbTx.gasLimit = arbGasUsageEstimate.mul(2)
+    unsignedArbTx.gasLimit = arbMaxGas
 
     return unsignedArbTx
   }
