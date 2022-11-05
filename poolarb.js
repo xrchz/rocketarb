@@ -113,7 +113,7 @@ async function run() {
   async function makeArbTx(ethAmount) {
     const depositFee = ethAmount.mul(dpFee).div(oneEther)
     const depositAmount = ethAmount.sub(depositFee)
-    const rethAmount = rethContract.getRethValue(depositAmount)
+    const rethAmount = await rethContract.getRethValue(depositAmount)
 
     console.log(`Aiming to arb ${ethers.utils.formatUnits(ethAmount, "ether")} ETH via ${ethers.utils.formatUnits(rethAmount, "ether")} rETH`)
 
@@ -280,7 +280,7 @@ async function run() {
           canParse(rocketNodeDepositInterface, tx)
         ) {
           console.log(`Found ${hash}: a minipool deposit!`)
-          await processTx(tx, tx.value, false)
+          await processTx(tx, tx.value)
         }
         else if (
           tx.to === rethAddress &&
