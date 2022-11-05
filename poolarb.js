@@ -161,6 +161,10 @@ async function run() {
       console.log('Warning: tx contains both gasPrice and maxFeePerGas; deleting former')
       delete tx.gasPrice
     }
+    if ((!('type' in tx) || tx.type === 0) && ('accessList' in tx)) {
+      console.log('Warning: type 0 tx with accessList; deleting')
+      delete tx.accessList
+    }
 
     function getRawTransaction(tx) {
       function addKey(acc, key) { if (key in tx) acc[key] = tx[key]; return acc }
