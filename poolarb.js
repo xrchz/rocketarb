@@ -274,7 +274,7 @@ async function run() {
 
     async function pollForTxs() {
       const hashes = await provider.send("eth_getFilterChanges", [filterId])
-      console.log(`Got ${hashes.length} pending txs`)
+      console.log(`${(new Date()).toLocaleString()}: Got ${hashes.length} pending txs`)
       let dropped = 0
       let skipped = 0
       for (const hash of hashes) {
