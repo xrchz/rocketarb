@@ -20,7 +20,8 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', 10)
        .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
        .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
-       .option('-g, --gas-limit <gas>', 'gas limit for arbitrage transaction', 800000)
+       .option('-g, --gas-limit <gas>', 'gas limit for arbitrage transaction', 900000)
+       .option('-u, --gas-refund <gas>', 'set min-profit to a gas refund of this much gas', 700000)
        .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
 program.parse()
@@ -120,8 +121,9 @@ async function getArbTx(encodedSignedDepositTx) {
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
   const swapData = getSwapData(signedDepositTx.value)
-  //TODO: make minProfit at least a gas refund
-  const unsignedArbTx = await arbContract.populateTransaction.arb(amountWei, 0, swapData)
+  const gasRefund = ethers.BigNumber.from(options.gasRefund)
+  const minProfit = gasRefund.mul(signedDepositTx.maxFeePerGas)
+  const unsignedArbTx = await arbContract.populateTransaction.arb(amountWei, minProfit, swapData)
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
   unsignedArbTx.nonce = signedDepositTx.nonce + 1
