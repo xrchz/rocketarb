@@ -277,6 +277,7 @@ async function run() {
       console.log(`${(new Date()).toLocaleString()}: Got ${hashes.length} pending txs`)
       let dropped = 0
       let skipped = 0
+      const dpSpace = dpSize.sub(await rocketDepositPool.getBalance())
       for (const hash of hashes) {
         const tx = await provider.getTransaction(hash)
         if (tx === null) dropped += 1
@@ -285,7 +286,7 @@ async function run() {
           canParse(rocketNodeDepositInterface, tx)
         ) {
           console.log(`Found ${hash}: a minipool deposit!`)
-          await processTx(tx, tx.value)
+          await processTx(tx, dpSpace.add(tx.value))
         }
         else if (
           tx.to === rethAddress &&
@@ -300,9 +301,8 @@ async function run() {
             continue
           }
           // know: rethContractBalance < rethAmount
-          const dpSpace = dpSize.sub(await rocketDepositPool.getBalance()).add(
-            rethAmount.sub(rethContractBalance))
-          await processTx(tx, dpSpace)
+          const amount = dpSpace.add(rethAmount.sub(rethContractBalance))
+          await processTx(tx, amount)
         }
         else {
           skipped += 1
@@ -314,7 +314,6 @@ async function run() {
         dpSkips--
         return
       }
-      const dpSpace = dpSize.sub(await rocketDepositPool.getBalance())
       if (dpSpace.gt(dpArbMin)) {
         console.log(`Found ${ethers.utils.formatUnits(dpSpace, 'ether')} free space in the DP: arbing immediately`)
         const unsignedArbTx = await makeArbTx(dpSpace)
