@@ -127,7 +127,7 @@ async function getArbTx(encodedSignedDepositTx) {
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
   unsignedArbTx.nonce = signedDepositTx.nonce + 1
-  unsignedArbTx.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas
+  unsignedArbTx.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas.mul(2)
   unsignedArbTx.maxFeePerGas = signedDepositTx.maxFeePerGas
   unsignedArbTx.gasLimit = parseInt(options.gasLimit)
 
