@@ -10,7 +10,7 @@ const fs = require('fs/promises')
 program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the swap', '2')
        .option('-w, --wallet-file <file>', 'saved wallet for arbitrage transactions', 'wallet.json')
-       .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', '3')
+       .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', '2')
 program.parse()
 const options = program.opts()
 
@@ -81,7 +81,7 @@ async function run() {
   const dpFee = await depositSettings.getDepositFee()
   const dpSize = await depositSettings.getMaximumDepositPoolSize()
   const minDeposit = await depositSettings.getMinimumDeposit()
-  const dpArbMin = minDeposit.mul(100) // TODO: tune
+  const dpArbMin = minDeposit.mul(20) // TODO: tune
 
   const rocketNodeDepositInterface = new ethers.utils.Interface(
     ["function deposit(uint256 _minimumNodeFee, bytes _validatorPubkey, bytes _validatorSignature, " +
@@ -137,7 +137,8 @@ async function run() {
 
     // TODO: estimate the gas usage better somehow?
     const arbMaxGas = ethers.BigNumber.from('900000')
-    const minProfit = feeData.maxFeePerGas.mul(arbMaxGas)
+    const minProfitGas = ethers.BigNumber.from('700000')
+    const minProfit = feeData.maxFeePerGas.mul(minProfitGas)
 
     if (ethers.utils.getAddress(swap.tx.to) !== '0x1111111254fb6c44bAC0beD2854e76F90643097d')
       console.log(`Warning: unexpected to address for swap: ${swap.tx.to}`)
@@ -147,8 +148,8 @@ async function run() {
       ethAmount, minProfit, swap.tx.data)
     unsignedArbTx.chainId = 1
     unsignedArbTx.type = 2
-    unsignedArbTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas.mul(2)
-    unsignedArbTx.maxFeePerGas = feeData.maxFeePerGas
+    unsignedArbTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas.mul(4)
+    unsignedArbTx.maxFeePerGas = feeData.maxFeePerGas.mul(3).div(2)
     unsignedArbTx.gasLimit = arbMaxGas
 
     return unsignedArbTx
@@ -246,10 +247,11 @@ async function run() {
             if ('firstRevert' in simulateRes && simulateRes.firstRevert !== undefined) {
               if (!('revert' in simulateRes.firstRevert))
                 console.log(JSON.stringify(simulateRes.firstRevert))
-	      else
+              else
                 console.log(`Revert during simulation, aborting: ${simulateRes.firstRevert.revert}`)
             }
             else {
+              console.log(JSON.stringify(simulateRes))
               console.log('Simulation succeeded, waiting for submission')
               const resolution = await submission.wait()
               console.log(`Resolution: ${flashbots.FlashbotsBundleResolution[resolution]}`)
