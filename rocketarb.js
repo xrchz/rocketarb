@@ -181,19 +181,20 @@ async function retrieveBundle() {
 
 const bundle = await (options.resume ? retrieveBundle() : makeBundle())
 
+console.log('waiting for network')
 const network = await provider.getNetwork()
+console.log(`got ${JSON.stringify(network)}`)
 const flashbotsProvider = await flashbots.FlashbotsBundleProvider.create(
-  provider,
-  randomSigner,
-  network.chainId === 5 ? 'https://relay-goerli.flashbots.net/' : undefined,
-  network.name)
+  provider, randomSigner, undefined, network.name)
+console.log('created flashbotsProvider')
 
 const currentBlockNumber = await provider.getBlockNumber()
-const currentBlock = await provider.getBlock(currentBlockNumber)
-const currentBaseFeePerGas = currentBlock.baseFeePerGas
 
 if (options.dryRun) {
   console.log(`Dry run only: using flashbots simulate on one block`)
+  const currentBlock = await provider.getBlock(currentBlockNumber)
+  const currentBaseFeePerGas = currentBlock.baseFeePerGas
+  console.log(`current base fee ${ethers.utils.formatUnits(currentBaseFeePerGas, 'gwei')} gwei`)
   const targetBlockNumber = currentBlockNumber + 1
   console.log(`Target block number: ${targetBlockNumber}`)
   const signedBundle = await flashbotsProvider.signBundle(bundle)
@@ -215,6 +216,8 @@ else {
 
   for (const [i, targetBlockNumber] of targetBlockNumbers.entries()) {
     const submission = submissions[i]
+    const currentBaseFeePerGas = (await provider.getBlock(await provider.getBlockNumber())).baseFeePerGas
+    console.log(`current base fee ${ethers.utils.formatUnits(currentBaseFeePerGas, 'gwei')} gwei`)
     console.log(`Target block number: ${targetBlockNumber}`)
     if ('error' in submission) {
       console.log(`RelayResponseError:\n${JSON.stringify(submission)}`)
