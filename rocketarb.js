@@ -17,6 +17,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
        .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
        .option('-e, --resume', 'do not create a new bundle, instead submit the one saved in the bundle file')
+       .option('-p, --no-use-dp', 'do not include space in the deposit pool in the arb')
        .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', 10)
        .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
        .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
@@ -78,10 +79,17 @@ async function getSwapData(amount) {
   const rocketDepositSettingsAddress = await rocketStorage.getAddress(
     ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDAOProtocolSettingsDeposit")))
   const depositSettings = new ethers.Contract(
-    rocketDepositSettingsAddress, ["function getDepositFee() view returns (uint256)"], provider)
+    rocketDepositSettingsAddress, ["function getDepositFee() view returns (uint256)",
+                                   "function getMaximumDepositPoolSize() view returns (uint256)"], provider)
+  const rocketDepositPoolAddress = await rocketStorage.getAddress(
+    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDepositPool")))
+  const rocketDepositPool = new ethers.Contract(
+    rocketDepositPoolAddress, ["function getBalance() view returns (uint256)"], provider)
   const dpFee = await depositSettings.getDepositFee()
+  const dpSize = await depositSettings.getMaximumDepositPoolSize()
+  const dpSpace = dpSize.sub(await rocketDepositPool.getBalance())
   const depositFee = amount.mul(dpFee).div(oneEther)
-  const depositAmount = amount.sub(depositFee)
+  const depositAmount = options.useDp ? amount.sub(depositFee).add(dpSpace) : amount.sub(depositFee)
   const rethAmount = await rethContract.getRethValue(depositAmount)
   const swapParams = new URLSearchParams({
     fromTokenAddress: rethAddress,
