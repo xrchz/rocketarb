@@ -17,6 +17,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
        .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
        .option('-e, --resume', 'do not create a new bundle, instead submit the one saved in the bundle file')
+       .option('-o, --resume-deposit', 'do not create a new deposit, use the one saved in the bundle file; but recreate the arb transaction')
        .option('-p, --no-use-dp', 'do not include space in the deposit pool in the arb')
        .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', 10)
        .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
@@ -30,12 +31,17 @@ const options = program.opts()
 
 console.log('Welcome to RocketArb: Deposit!')
 
-if (!options.resume) {
+if (!options.resume && !options.resumeDeposit) {
   var answer = prompt('Have you done a dry run of depositing your minipool using the smartnode? ')
   if (!(answer === 'y' || answer === 'yes')) {
     console.log('Do that first then retry.')
     process.exit()
   }
+}
+
+if (options.resume && options.resumeDeposit) {
+  console.log('At most one of --resume and --resume-deposit may be given')
+  process.exit()
 }
 
 const oneEther = ethers.utils.parseUnits("1", "ether")
@@ -185,9 +191,17 @@ async function retrieveBundle() {
   return JSON.parse(await fs.readFile(options.bundleFile, 'utf-8'))
 }
 
+async function retrieveDeposit() {
+  console.log(`Resuming using deposit from ${options.bundleFile}`)
+  const bundle = JSON.parse(await fs.readFile(options.bundleFile, 'utf-8'))
+  bundle[1].signedTransaction = await getArbTx(bundle[0].signedTransaction)
+  return bundle
+}
+
 ;(async () => {
 
-const bundle = await (options.resume ? retrieveBundle() : makeBundle())
+const bundle = await (options.resumeDeposit ? retrieveDeposit() :
+                      options.resume ? retrieveBundle() : makeBundle())
 
 console.log('waiting for network')
 const network = await provider.getNetwork()
