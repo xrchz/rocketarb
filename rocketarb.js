@@ -51,6 +51,8 @@ const amountWei = oneEther.mul(options.amount)
 const randomSigner = ethers.Wallet.createRandom()
 const provider = new ethers.providers.JsonRpcProvider(options.rpc)
 
+const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+
 function getDepositTx() {
   var cmd = options.daemon
   if (options.maxFee) cmd = cmd.concat(' --maxFee ', options.maxFee)
@@ -73,8 +75,7 @@ function getDepositTx() {
   return encodedSignedDepositTx
 }
 
-async function getSwapData(amount) {
-  const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+async function getAmounts(amount) {
   const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
   const rocketStorage = new ethers.Contract(
     rocketStorageAddress, ["function getAddress(bytes32 key) view returns (address)"], provider)
@@ -94,9 +95,16 @@ async function getSwapData(amount) {
   const dpFee = await depositSettings.getDepositFee()
   const dpSize = await depositSettings.getMaximumDepositPoolSize()
   const dpSpace = dpSize.sub(await rocketDepositPool.getBalance())
-  const depositFee = amount.mul(dpFee).div(oneEther)
-  const depositAmount = options.useDp ? amount.sub(depositFee).add(dpSpace) : amount.sub(depositFee)
+  const ethAmount = options.useDp ? amount.add(dpSpace) : amount
+  const depositFee = ethAmount.mul(dpFee).div(oneEther)
+  const depositAmount = ethAmount.sub(depositFee)
   const rethAmount = await rethContract.getRethValue(depositAmount)
+  console.log(`Total rETH amount to swap: ${ethers.utils.formatUnits(rethAmount, 'ether')} ` +
+              `(from ${ethers.utils.formatUnits(ethAmount, 'ether')} ETH deposit (${ethers.utils.formatUnits(depositAmount, 'ether')} after mint fee))`)
+  return [ethAmount, rethAmount, rethAddress]
+}
+
+async function getSwapData(rethAmount, rethAddress) {
   const swapParams = new URLSearchParams({
     fromTokenAddress: rethAddress,
     toTokenAddress: wethAddress,
@@ -134,10 +142,11 @@ async function getArbTx(encodedSignedDepositTx) {
   const arbContract = new ethers.Contract(options.arbContract, arbAbi, provider)
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
-  const swapData = getSwapData(signedDepositTx.value)
+  const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
+  const swapData = await getSwapData(rethAmount, rethAddress)
   const gasRefund = ethers.BigNumber.from(options.gasRefund)
   const minProfit = gasRefund.mul(signedDepositTx.maxFeePerGas)
-  const unsignedArbTx = await arbContract.populateTransaction.arb(amountWei, minProfit, swapData)
+  const unsignedArbTx = await arbContract.populateTransaction.arb(ethAmount, minProfit, swapData)
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
   unsignedArbTx.nonce = signedDepositTx.nonce + 1
