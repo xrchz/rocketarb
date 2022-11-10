@@ -36,8 +36,24 @@ created in the deposit pool by your new minipool.
 - Use the `--resume` option to try submitting the flashbots bundle again (in
   case it failed) without recreating the transactions. (The bundle gets saved
   in `bundle.json` by default.)
-- (Advanced - not necessary) Every time we ask the smartnode for a deposit
-  transaction, it increments its internal validator index (saved in your node's
-  wallet file). If you need to re-run (e.g., to use a different gas price) and
-  don't want to waste the index, you can manually decrement it by editing the
-  wallet file.
+- The gas fee needs to be attractive enough for Flashbots to accept the bundle:
+  the target block base fee per gas is burned and the block proposer receives
+  any additional fee per gas up to the specified maximum priority fee per gas
+  limited by the specified maximum fee per gas. The priority fee is what makes
+  a bundle attractive. `rocketarb` uses the same maximum fees for both the
+  deposit and arbitrage transactions, and the total gas will be about 2.7
+  million (approximately: 2 million for the deposit, 700k for the arbitrage --
+  these vary and can be hard to predict exactly).
+- `rocketarb` will try to ensure to refund at least some (700k gas worth by
+  default, change it with the `--gas-refund` option) of your gas costs with the
+  arbitrage profits. This is ensured by making the arbitrage transaction revert
+  (`not enough profit`) if it does not produce at least this much profit.
+- If your bundle is not getting included (`BlockPassedWithoutInclusion`) most
+  likely the transactions are reverting with some failure (try the `--dry-run`
+  option to investigate), or the gas fees are too low for the current base fee.
+- Every time we ask the smartnode for a deposit transaction, it increments its
+  internal validator index (saved in your node's wallet file). If you need to
+  re-run (e.g., to use a different maximum fee per gas) and don't want to waste
+  the index, you can manually decrement it by editing the wallet file. Wasting
+  indices is not a problem for your node, however - the generated validator
+  keys for an unused index will simply remain unused.

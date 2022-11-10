@@ -11,8 +11,8 @@ const fs = require('fs/promises')
 program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-d, --daemon <cmd>', 'command (+ args if req) to run the rocketpool smartnode daemon', 'docker exec rocketpool_node /go/bin/rocketpool')
        .option('-l, --salt <salt>', 'salt for custom minipool address')
-       .option('-f, --max-fee <maxFee>', 'max transaction fee in gwei')
-       .option('-i, --max-prio <maxPrio>', 'max transaction priority fee in gwei')
+       .option('-f, --max-fee <maxFee>', 'max transaction fee per gas in gwei')
+       .option('-i, --max-prio <maxPrio>', 'max transaction priority fee per gas in gwei')
        .option('-x, --extra-args <args>', 'extra (space-separated) arguments to pass to daemon calls')
        .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
        .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
@@ -135,7 +135,7 @@ async function getArbTx(encodedSignedDepositTx) {
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
   unsignedArbTx.nonce = signedDepositTx.nonce + 1
-  unsignedArbTx.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas.mul(2)
+  unsignedArbTx.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas
   unsignedArbTx.maxFeePerGas = signedDepositTx.maxFeePerGas
   unsignedArbTx.gasLimit = parseInt(options.gasLimit)
 
