@@ -147,11 +147,21 @@ async function getArbTx(encodedSignedDepositTx) {
   const gasRefund = ethers.BigNumber.from(options.gasRefund)
   const minProfit = gasRefund.mul(signedDepositTx.maxFeePerGas)
   const unsignedArbTx = await arbContract.populateTransaction.arb(ethAmount, minProfit, swapData)
+
+  // use fee data from deposit tx, but override with options if deposit was resumed
+  const feeData = {}
+  feeData.maxFeePerGas = signedDepositTx.maxFeePerGas
+  feeData.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas
+  if (options.resumeDeposit && options.maxFee)
+    feeData.maxFeePerGas = ethers.utils.parseUnits(options.maxFee, 'gwei')
+  if (options.resumeDeposit && options.maxPrio)
+    feeData.maxPriorityFeePerGas = ethers.utils.parseUnits(options.maxPrio, 'gwei')
+
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
   unsignedArbTx.nonce = signedDepositTx.nonce + 1
-  unsignedArbTx.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas
-  unsignedArbTx.maxFeePerGas = signedDepositTx.maxFeePerGas
+  unsignedArbTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas
+  unsignedArbTx.maxFeePerGas = feeData.maxFeePerGas
   unsignedArbTx.gasLimit = parseInt(options.gasLimit)
 
   // sign randomly first to get around go-ethereum unmarshalling issue
