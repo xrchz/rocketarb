@@ -44,7 +44,7 @@ created in the deposit pool by your new minipool.
   deposit and arbitrage transactions, and the total gas will be about 2.7
   million (approximately: 2 million for the deposit, 700k for the arbitrage --
   these vary and can be hard to predict exactly).
-- `rocketarb` will try to ensure to refund at least some (700k gas worth by
+- `rocketarb` will try to ensure to refund at least some (2.5M gas worth by
   default, change it with the `--gas-refund` option) of your gas costs with the
   arbitrage profits. This is ensured by making the arbitrage transaction revert
   (`not enough profit`) if it does not produce at least this much profit.
