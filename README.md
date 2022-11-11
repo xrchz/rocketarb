@@ -33,9 +33,11 @@ created in the deposit pool by your new minipool.
 - The smartnode needs to be at least version 1.7.0.
 - Try `--rpc http://<your node local ip>:8545` if the default
   (`http://localhost:8545`) does not work.
-- Use the `--resume` option to try submitting the flashbots bundle again (in
-  case it failed) without recreating the transactions. (The bundle gets saved
-  in `bundle.json` by default.)
+- You can try submitting the Flashbots bundle again (in case it failed) without
+  recreating the transactions. Use `--resume-deposit` to only recreate the arb
+  transaction (with fresh 1Inch swap data); use the `--resume` option to
+  recreate neither (i.e., reuse both transactions). (The bundle gets saved in
+  `bundle.json` by default.)
 - The gas fee needs to be attractive enough for Flashbots to accept the bundle:
   the target block base fee per gas is burned and the block proposer receives
   any additional fee per gas up to the specified maximum priority fee per gas
