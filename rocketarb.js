@@ -60,10 +60,10 @@ function getDepositTx() {
   if (options.extraArgs) cmd = cmd.concat(' ', options.extraArgs)
   const salt = options.salt ? parseInt(options.salt, 16) : Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
 
-  cmd = cmd.concat(' api node deposit ',
-    ethers.utils.formatUnits(amountWei, "wei"),
-    ' 0.15 ',
-    salt.toString(),
+  cmd = cmd.concat(' api node deposit',
+    ' ', ethers.utils.formatUnits(amountWei, "wei"),
+    ' ', options.minFee.toString(),
+    ' ', salt.toString(),
     ' false')
 
   console.log(`Creating deposit transaction by executing smartnode: ${cmd}`)
