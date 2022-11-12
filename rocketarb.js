@@ -9,6 +9,7 @@ const prompt = require('prompt-sync')()
 const fs = require('fs/promises')
 
 program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
+       .option('-t, --premium', 'print the rETH/ETH primary and secondary rates and exit')
        .option('-f, --max-fee <maxFee>', 'max transaction fee per gas in gwei')
        .option('-i, --max-prio <maxPrio>', 'max transaction priority fee per gas in gwei')
        .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
@@ -31,7 +32,7 @@ const options = program.opts()
 
 console.log('Welcome to RocketArb: Deposit!')
 
-if (!options.resume && !options.resumeDeposit) {
+if (!options.premium && !options.resume && !options.resumeDeposit) {
   var answer = prompt('Have you done a dry run of depositing your minipool using the smartnode? ')
   if (!(answer === 'y' || answer === 'yes')) {
     console.log('Do that first then retry.')
@@ -52,6 +53,44 @@ const randomSigner = ethers.Wallet.createRandom()
 const provider = new ethers.providers.JsonRpcProvider(options.rpc)
 
 const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
+const spotPriceAddress = '0x07D91f5fb9Bf7798734C3f606dB065549F6893bb'
+
+async function getRocketContracts() {
+  const rocketStorage = new ethers.Contract(
+    rocketStorageAddress, ["function getAddress(bytes32 key) view returns (address)"], provider)
+  const rethAddress = await rocketStorage.getAddress(
+    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketTokenRETH")))
+  const rethContract = new ethers.Contract(
+    rethAddress, ["function getRethValue(uint256 ethAmount) view returns (uint256)",
+                  "function getExchangeRate() view returns (uint256)"], provider)
+  const rocketDepositSettingsAddress = await rocketStorage.getAddress(
+    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDAOProtocolSettingsDeposit")))
+  const depositSettings = new ethers.Contract(
+    rocketDepositSettingsAddress, ["function getDepositFee() view returns (uint256)",
+                                   "function getMaximumDepositPoolSize() view returns (uint256)"], provider)
+  const rocketDepositPoolAddress = await rocketStorage.getAddress(
+    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDepositPool")))
+  const rocketDepositPool = new ethers.Contract(
+    rocketDepositPoolAddress, ["function getBalance() view returns (uint256)"], provider)
+  return [rethAddress, rethContract, depositSettings, rocketDepositPool]
+}
+
+async function printPremium() {
+  const [rethAddress, rethContract] = await getRocketContracts()
+  const spotPriceContract = new ethers.Contract(spotPriceAddress,
+    ['function getRateToEth(address, bool) view returns (uint256)'], provider);
+  const primaryRate = await rethContract.getExchangeRate()
+  const secondaryRate = await spotPriceContract.getRateToEth(rethAddress, true)
+  const percentage = ethers.utils.formatUnits(
+    ((primaryRate.sub(secondaryRate).abs()).mul('100')).mul('1000').div(primaryRate),
+    3)
+  const direction = primaryRate.lte(secondaryRate) ? 'premium' : 'discount'
+  const rateToString = r => ethers.utils.formatUnits(r.sub(r.mod(1e12)))
+  console.log(`rETH protocol rate: ${rateToString(primaryRate)} ETH`)
+  console.log(`rETH   market rate: ${rateToString(secondaryRate)} ETH`)
+  console.log(`${percentage}% ${direction}`)
+}
 
 function getDepositTx() {
   var cmd = options.daemon
@@ -76,22 +115,7 @@ function getDepositTx() {
 }
 
 async function getAmounts(amount) {
-  const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
-  const rocketStorage = new ethers.Contract(
-    rocketStorageAddress, ["function getAddress(bytes32 key) view returns (address)"], provider)
-  const rethAddress = await rocketStorage.getAddress(
-    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketTokenRETH")))
-  const rethContract = new ethers.Contract(
-    rethAddress, ["function getRethValue(uint256 ethAmount) view returns (uint256)"], provider)
-  const rocketDepositSettingsAddress = await rocketStorage.getAddress(
-    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDAOProtocolSettingsDeposit")))
-  const depositSettings = new ethers.Contract(
-    rocketDepositSettingsAddress, ["function getDepositFee() view returns (uint256)",
-                                   "function getMaximumDepositPoolSize() view returns (uint256)"], provider)
-  const rocketDepositPoolAddress = await rocketStorage.getAddress(
-    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDepositPool")))
-  const rocketDepositPool = new ethers.Contract(
-    rocketDepositPoolAddress, ["function getBalance() view returns (uint256)"], provider)
+  const [rethAddress, rethContract, depositSettings, rocketDepositPool] = await getRocketContracts()
   const dpFee = await depositSettings.getDepositFee()
   const dpSize = await depositSettings.getMaximumDepositPoolSize()
   const dpSpace = dpSize.sub(await rocketDepositPool.getBalance())
@@ -218,6 +242,11 @@ async function retrieveDeposit() {
 }
 
 ;(async () => {
+
+if (options.premium) {
+  await printPremium()
+  return
+}
 
 const bundle = await (options.resumeDeposit ? retrieveDeposit() :
                       options.resume ? retrieveBundle() : makeBundle())
