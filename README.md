@@ -18,11 +18,11 @@ any problems!
 
 ## What does it do?
 - Ask the smartnode to create a minipool deposit transaction from your node
-  wallet address.
+  account.
 - Create a transaction to call the rocketarb contract, which will flash loan 16
   ETH, deposit it in the Rocket Pool deposit pool (using the newly created
   space from the minipool deposit), sell the minted rETH using 1Inch, repay the
-  flash loan, and send any profit back to your node wallet.
+  flash loan, and send any profit back to your node account.
 - Submit the two transactions above in a bundle using Flashbots.
 
 This way you get to benefit from the rETH premium by the space temporarily
@@ -63,3 +63,13 @@ created in the deposit pool by your new minipool.
   the index, you can manually decrement it by editing the wallet file. Wasting
   indices is not a problem for your node, however - the generated validator
   keys for an unused index will simply remain unused.
+
+## Do it without a flash loan
+- Pass the `--no-flash-loan` option to use capital (e.g., 16 ETH, or whatever
+  the `--amount` of your minipool deposit is) in your node account instead of a
+  flash loan.
+- Why do this? It could reduce the total gas cost, and thereby increase
+  profits. You can control the gas limits with the various `--X-gas-limit`
+  options.
+- If you do not have enough capital to additionally cover existing free space
+  in the deposit pool, pass the `--no-use-dp` option.

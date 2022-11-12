@@ -3,67 +3,78 @@
 const { execSync } = require('child_process')
 const { program } = require('commander')
 const https = require('https')
-const ethers = require('ethers')
-const flashbots = require('@flashbots/ethers-provider-bundle')
-const prompt = require('prompt-sync')()
-const fs = require('fs/promises')
+  const ethers = require('ethers')
+  const flashbots = require('@flashbots/ethers-provider-bundle')
+  const prompt = require('prompt-sync')()
+  const fs = require('fs/promises')
 
-program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
-       .option('-t, --premium', 'print the rETH/ETH primary and secondary rates and exit')
-       .option('-f, --max-fee <maxFee>', 'max transaction fee per gas in gwei')
-       .option('-i, --max-prio <maxPrio>', 'max transaction priority fee per gas in gwei')
-       .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
-       .option('-e, --resume', 'do not create a new bundle, instead submit the one saved in the bundle file')
-       .option('-o, --resume-deposit', 'do not create a new deposit, use the one saved in the bundle file; but recreate the arb transaction')
-       .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', 10)
-       .option('-l, --salt <salt>', 'salt for custom minipool address')
-       .option('-u, --gas-refund <gas>', 'set min-profit to a gas refund of this much gas', 2800000)
-       .option('-g, --gas-limit <gas>', 'gas limit for arbitrage transaction', 990000)
-       .option('-p, --no-use-dp', 'do not include space in the deposit pool in the arb')
-       .option('-d, --daemon <cmd>', 'command (+ args if req) to run the rocketpool smartnode daemon', 'docker exec rocketpool_node /go/bin/rocketpool')
-       .option('-x, --extra-args <args>', 'extra (space-separated) arguments to pass to daemon calls')
-       .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
-       .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
-       .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
-       .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571')
-       .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
-program.parse()
-const options = program.opts()
+  program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
+         .option('-t, --premium', 'print the rETH/ETH primary and secondary rates and exit')
+         .option('-f, --max-fee <maxFee>', 'max transaction fee per gas in gwei')
+         .option('-i, --max-prio <maxPrio>', 'max transaction priority fee per gas in gwei')
+         .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
+         .option('-e, --resume', 'do not create a new bundle, instead submit the one saved in the bundle file')
+         .option('-o, --resume-deposit', 'do not create a new deposit, use the one saved in the bundle file; but recreate the arb transaction')
+         .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', 10)
+         .option('-l, --salt <salt>', 'salt for custom minipool address')
+         .option('-u, --gas-refund <gas>', 'set min-profit to a gas refund of this much gas', 2800000)
+         .option('-g, --gas-limit <gas>', 'gas limit for arbitrage transaction', 990000)
+         .option('-p, --no-use-dp', 'do not include space in the deposit pool in the arb')
+         .option('-d, --daemon <cmd>', 'command (+ args if req) to run the rocketpool smartnode daemon', 'docker exec rocketpool_node /go/bin/rocketpool')
+         .option('-x, --extra-args <args>', 'extra (space-separated) arguments to pass to daemon calls')
+         .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
+         .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
+         .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
+         .option('-y, --no-flash-loan', 'do not use the contract to make a flash loan for the arb: use capital in the node wallet instead')
+         .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571')
+         .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
+         .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --no-flash-loan)', 200000)
+         .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --no-flash-loan)', 80000)
+         .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction (only relevant for --no-flash-loan)', 400000)
+  program.parse()
+  const options = program.opts()
 
-console.log('Welcome to RocketArb: Deposit!')
+  console.log('Welcome to RocketArb: Deposit!')
 
-if (!options.premium && !options.resume && !options.resumeDeposit) {
-  var answer = prompt('Have you done a dry run of depositing your minipool using the smartnode? ')
-  if (!(answer === 'y' || answer === 'yes')) {
-    console.log('Do that first then retry.')
+  if (!options.premium && !options.resume && !options.resumeDeposit) {
+    var answer = prompt('Have you done a dry run of depositing your minipool using the smartnode? ')
+    if (!(answer === 'y' || answer === 'yes')) {
+      console.log('Do that first then retry.')
+      process.exit()
+    }
+  }
+
+  if (options.resume && options.resumeDeposit) {
+    console.log('At most one of --resume and --resume-deposit may be given')
     process.exit()
   }
-}
 
-if (options.resume && options.resumeDeposit) {
-  console.log('At most one of --resume and --resume-deposit may be given')
-  process.exit()
-}
+  const oneEther = ethers.utils.parseUnits("1", "ether")
+  const oneGwei = ethers.utils.parseUnits("1", "gwei")
+  const amountWei = oneEther.mul(options.amount)
 
-const oneEther = ethers.utils.parseUnits("1", "ether")
-const oneGwei = ethers.utils.parseUnits("1", "gwei")
-const amountWei = oneEther.mul(options.amount)
+  const randomSigner = ethers.Wallet.createRandom()
+  const provider = new ethers.providers.JsonRpcProvider(options.rpc)
 
-const randomSigner = ethers.Wallet.createRandom()
-const provider = new ethers.providers.JsonRpcProvider(options.rpc)
+  const ethAddress = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+  const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+  const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
+  const spotPriceAddress = '0x07D91f5fb9Bf7798734C3f606dB065549F6893bb'
+  const swapRouterAddress = '0x1111111254fb6c44bAC0beD2854e76F90643097d'
 
-const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
-const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
-const spotPriceAddress = '0x07D91f5fb9Bf7798734C3f606dB065549F6893bb'
+const rocketContracts = []
 
-async function getRocketContracts() {
+async function populateRocketContracts() {
+  if (rocketContracts.length)
+    return
   const rocketStorage = new ethers.Contract(
     rocketStorageAddress, ["function getAddress(bytes32 key) view returns (address)"], provider)
   const rethAddress = await rocketStorage.getAddress(
     ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketTokenRETH")))
   const rethContract = new ethers.Contract(
     rethAddress, ["function getRethValue(uint256 ethAmount) view returns (uint256)",
-                  "function getExchangeRate() view returns (uint256)"], provider)
+                  "function getExchangeRate() view returns (uint256)",
+                  "function approve(address spender, uint256 amount) nonpayable returns (bool)"], provider)
   const rocketDepositSettingsAddress = await rocketStorage.getAddress(
     ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDAOProtocolSettingsDeposit")))
   const depositSettings = new ethers.Contract(
@@ -72,12 +83,17 @@ async function getRocketContracts() {
   const rocketDepositPoolAddress = await rocketStorage.getAddress(
     ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketDepositPool")))
   const rocketDepositPool = new ethers.Contract(
-    rocketDepositPoolAddress, ["function getBalance() view returns (uint256)"], provider)
-  return [rethAddress, rethContract, depositSettings, rocketDepositPool]
+    rocketDepositPoolAddress, ["function getBalance() view returns (uint256)",
+                               "function deposit() payable"], provider)
+  rocketContracts.push(rethAddress)
+  rocketContracts.push(rethContract)
+  rocketContracts.push(depositSettings)
+  rocketContracts.push(rocketDepositPool)
 }
 
 async function printPremium() {
-  const [rethAddress, rethContract] = await getRocketContracts()
+  await populateRocketContracts()
+  const [rethAddress, rethContract] = rocketContracts
   const spotPriceContract = new ethers.Contract(spotPriceAddress,
     ['function getRateToEth(address, bool) view returns (uint256)'], provider);
   const primaryRate = await rethContract.getExchangeRate()
@@ -115,7 +131,8 @@ function getDepositTx() {
 }
 
 async function getAmounts(amount) {
-  const [rethAddress, rethContract, depositSettings, rocketDepositPool] = await getRocketContracts()
+  await populateRocketContracts()
+  const [rethAddress, rethContract, depositSettings, rocketDepositPool] = rocketContracts
   const dpFee = await depositSettings.getDepositFee()
   const dpSize = await depositSettings.getMaximumDepositPoolSize()
   const dpSpace = dpSize.sub(await rocketDepositPool.getBalance())
@@ -128,17 +145,19 @@ async function getAmounts(amount) {
   return [ethAmount, rethAmount, rethAddress]
 }
 
-async function getSwapData(rethAmount, rethAddress) {
-  const swapParams = new URLSearchParams({
+async function getSwapData(rethAmount, rethAddress, fromAddress) {
+  const swapParams = {
     fromTokenAddress: rethAddress,
-    toTokenAddress: wethAddress,
-    fromAddress: options.arbContract,
+    toTokenAddress: fromAddress ? ethAddress : wethAddress,
+    fromAddress: fromAddress || options.arbContract,
     amount: rethAmount,
     slippage: options.slippage,
     allowPartialFill: false,
     disableEstimate: true
-  }).toString()
-  const url = `https://api.1inch.io/v4.0/1/swap?${swapParams}`
+  }
+  if (fromAddress) swapParams.gasLimit = options.swapGasLimit
+  const queryString = new URLSearchParams(swapParams).toString()
+  const url = `https://api.1inch.io/v4.0/1/swap?${queryString}`
   const apiCall = new Promise((resolve, reject) => {
     const req = https.get(url,
       (res) => {
@@ -154,9 +173,87 @@ async function getSwapData(rethAmount, rethAddress) {
     req.on('error', reject)
   })
   const swap = await apiCall
-  if (ethers.utils.getAddress(swap.tx.to) !== '0x1111111254fb6c44bAC0beD2854e76F90643097d')
+  if (ethers.utils.getAddress(swap.tx.to) !== swapRouterAddress)
     console.log(`Warning: unexpected to address for swap: ${swap.tx.to}`)
   return swap.tx.data
+}
+
+function getFeeData(signedDepositTx) {
+  // use fee data from deposit tx, but override with options if deposit was resumed
+  const feeData = {}
+
+  feeData.maxFeePerGas = signedDepositTx.maxFeePerGas
+  if (options.resumeDeposit && options.maxFee)
+    feeData.maxFeePerGas = ethers.utils.parseUnits(options.maxFee, 'gwei')
+
+  feeData.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas
+  if (options.resumeDeposit && options.maxPrio)
+    feeData.maxPriorityFeePerGas = ethers.utils.parseUnits(options.maxPrio, 'gwei')
+
+  return feeData
+}
+
+async function signTx(tx) {
+  // sign randomly first to get around go-ethereum unmarshalling issue
+  const fakeSigned = await randomSigner.signTransaction(tx)
+  cmd = options.daemon.concat(' api node sign ', fakeSigned.substring(2))
+  const signOutput = JSON.parse(execSync(cmd))
+  console.assert(signOutput.status === 'success', `signing transaction failed: ${signOutput.error}`)
+  return signOutput.signedData
+}
+
+async function getArbBundleNoFlash(encodedSignedDepositTx) {
+  // transactions to bundle after the deposit:
+  // 1. deposit ethAmount ETH into deposit pool
+  // 2. approve swapRouter to transfer rethAmount
+  // 3. swapTx to swap rETH for ETH (note: not WETH)
+
+  const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
+  const feeData = getFeeData(signedDepositTx)
+
+  const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
+  await populateRocketContracts()
+  const [ , rethContract, , rocketDepositPool] = rocketContracts
+
+  const unsignedMintTx = await rocketDepositPool.populateTransaction.deposit({value: ethAmount})
+  unsignedMintTx.type = 2
+  unsignedMintTx.chainId = signedDepositTx.chainId
+  unsignedMintTx.nonce = signedDepositTx.nonce + 1
+  unsignedMintTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas
+  unsignedMintTx.maxFeePerGas = feeData.maxFeePerGas
+  unsignedMintTx.gasLimit = parseInt(options.mintGasLimit)
+
+  const unsignedApproveTx = await rethContract.populateTransaction.approve(swapRouterAddress, rethAmount)
+  unsignedApproveTx.type = unsignedMintTx.type
+  unsignedApproveTx.chainId = unsignedMintTx.chainId
+  unsignedApproveTx.nonce = unsignedMintTx.nonce + 1
+  unsignedApproveTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas
+  unsignedApproveTx.maxFeePerGas = feeData.maxFeePerGas
+  unsignedApproveTx.gasLimit = parseInt(options.approveGasLimit)
+
+  const swapData = await getSwapData(rethAmount, rethAddress, signedDepositTx.from)
+  const unsignedSwapTx = {}
+  unsignedSwapTx.type = unsignedApproveTx.type
+  unsignedSwapTx.chainId = unsignedApproveTx.chainId
+  unsignedSwapTx.nonce = unsignedApproveTx.nonce + 1
+  unsignedSwapTx.maxPriorityFeePerGas = unsignedApproveTx.maxPriorityFeePerGas
+  unsignedSwapTx.maxFeePerGas = unsignedApproveTx.maxFeePerGas
+  unsignedSwapTx.data = swapData
+  unsignedSwapTx.gasLimit = parseInt(options.swapGasLimit)
+
+  const encodedSignedMintTx = await signTx(unsignedMintTx)
+  console.log('Signed mint transaction with smartnode')
+  const encodedSignedApproveTx = await signTx(unsignedApproveTx)
+  console.log('Signed approve transaction with smartnode')
+  const encodedSignedSwapTx = await signTx(unsignedSwapTx)
+  console.log('Signed swap transaction with smartnode')
+
+  return [
+    {signedTransaction: encodedSignedDepositTx},
+    {signedTransaction: encodedSignedMintTx},
+    {signedTransaction: encodedSignedApproveTx},
+    {signedTransaction: encodedSignedSwapTx}
+  ]
 }
 
 async function getArbTx(encodedSignedDepositTx) {
@@ -170,17 +267,9 @@ async function getArbTx(encodedSignedDepositTx) {
   const swapData = await getSwapData(rethAmount, rethAddress)
   const gasRefund = ethers.BigNumber.from(options.gasRefund)
   const minProfit = gasRefund.mul(signedDepositTx.maxFeePerGas)
+  const feeData = getFeeData(signedDepositTx)
+
   const unsignedArbTx = await arbContract.populateTransaction.arb(ethAmount, minProfit, swapData)
-
-  // use fee data from deposit tx, but override with options if deposit was resumed
-  const feeData = {}
-  feeData.maxFeePerGas = signedDepositTx.maxFeePerGas
-  feeData.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas
-  if (options.resumeDeposit && options.maxFee)
-    feeData.maxFeePerGas = ethers.utils.parseUnits(options.maxFee, 'gwei')
-  if (options.resumeDeposit && options.maxPrio)
-    feeData.maxPriorityFeePerGas = ethers.utils.parseUnits(options.maxPrio, 'gwei')
-
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
   unsignedArbTx.nonce = signedDepositTx.nonce + 1
@@ -188,13 +277,7 @@ async function getArbTx(encodedSignedDepositTx) {
   unsignedArbTx.maxFeePerGas = feeData.maxFeePerGas
   unsignedArbTx.gasLimit = parseInt(options.gasLimit)
 
-  // sign randomly first to get around go-ethereum unmarshalling issue
-  const fakeSigned = await randomSigner.signTransaction(unsignedArbTx)
-  cmd = options.daemon.concat(' api node sign ', fakeSigned.substring(2))
-  const signOutput = JSON.parse(execSync(cmd))
-  console.assert(signOutput.status === 'success', `signing arb transaction failed: ${signOutput.error}`)
-  const encodedSignedArbTx = signOutput.signedData
-
+  const encodedSignedArbTx = await signTx(unsignedArbTx)
   console.log('Signed arb transaction with smartnode')
 
   return encodedSignedArbTx
@@ -202,24 +285,34 @@ async function getArbTx(encodedSignedDepositTx) {
 
 async function makeBundle() {
   const encodedSignedDepositTx = getDepositTx()
-  const encodedSignedArbTx = await getArbTx(encodedSignedDepositTx)
-  const bundle = [
-    {signedTransaction: encodedSignedDepositTx},
-    {signedTransaction: encodedSignedArbTx}
-  ]
-  return bundle
+  if (options.flashLoan) {
+    const encodedSignedArbTx = await getArbTx(encodedSignedDepositTx)
+    const bundle = [
+      {signedTransaction: encodedSignedDepositTx},
+      {signedTransaction: encodedSignedArbTx}
+    ]
+    return bundle
+  }
+  else {
+    return await getArbBundleNoFlash(encodedSignedDepositTx)
+  }
+}
+
+async function retrieveDeposit() {
+  console.log(`Resuming using deposit from ${options.bundleFile}`)
+  const deposit = JSON.parse(await fs.readFile(options.bundleFile, 'utf-8'))[0]
+  if (options.flashLoan) {
+    const arbTx = await getArbTx(deposit.signedTransaction)
+    return [deposit, {signedTransaction: arbTx}]
+  }
+  else {
+    return await getArbBundleNoFlash(deposit.signedTransaction)
+  }
 }
 
 async function retrieveBundle() {
   console.log(`Resuming with bundle from ${options.bundleFile}`)
   return JSON.parse(await fs.readFile(options.bundleFile, 'utf-8'))
-}
-
-async function retrieveDeposit() {
-  console.log(`Resuming using deposit from ${options.bundleFile}`)
-  const bundle = JSON.parse(await fs.readFile(options.bundleFile, 'utf-8'))
-  bundle[1].signedTransaction = await getArbTx(bundle[0].signedTransaction)
-  return bundle
 }
 
 ;(async () => {
