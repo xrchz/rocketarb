@@ -212,7 +212,6 @@ async function getArbBundleNoFlash(encodedSignedDepositTx) {
   const feeData = getFeeData(signedDepositTx)
 
   const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
-  await populateRocketContracts()
   const [ , rethContract, , rocketDepositPool] = rocketContracts
 
   const unsignedMintTx = await rocketDepositPool.populateTransaction.deposit({value: ethAmount})
@@ -348,8 +347,6 @@ if (options.dryRun) {
   const signedBundle = await flashbotsProvider.signBundle(bundle)
   const simulation = await flashbotsProvider.simulate(signedBundle, targetBlockNumber)
   console.log(JSON.stringify(simulation, null, 2))
-  const bundlePricing = flashbotsProvider.calculateBundlePricing(simulation.results, currentBaseFeePerGas)
-  console.log(JSON.stringify(bundlePricing, null, 2))
 }
 else {
   const maxTries = parseInt(options.maxTries)
@@ -360,7 +357,6 @@ else {
     promises.push(flashbotsProvider.sendBundle(bundle, targetBlockNumber))
   }
   const submissions = await Promise.all(promises)
-  // const failures = []
 
   for (const [i, targetBlockNumber] of targetBlockNumbers.entries()) {
     const submission = submissions[i]
@@ -374,11 +370,6 @@ else {
       const resolution = await submission.wait()
       console.log(`Resolution: ${flashbots.FlashbotsBundleResolution[resolution]}`)
       if (resolution === flashbots.FlashbotsBundleResolution.BlockPassedWithoutInclusion) {
-        /*
-        if (network.chainId === 1) {
-          failures.push([submission, targetBlockNumber])
-        }
-        */
         continue
       }
       else {
@@ -388,20 +379,5 @@ else {
     }
   }
 }
-
-/* flashbots debugging (only possible on mainnet)
-if (failures.length) {
-  console.log('Bundle inclusion failed')
-  console.log('User stats:')
-  const userStats = await flashbotsProvider.getUserStats()
-  console.log(JSON.stringify(userStats, null, 2))
-  for (const [submission, targetBlockNumber] of failures) {
-    const signedBundle = submission.bundleTransactions.map(a => a.signedTransaction)
-    const conflictReport = await flashbotsProvider.getConflictingBundle(signedBundle, targetBlockNumber)
-    console.log(`Conflict report for ${targetBlockNumber}: ${flashbots.FlashbotsBundleConflictType[conflictReport.conflictType]}`)
-    console.log(JSON.stringify(conflictReport, null, 2))
-  }
-}
-*/
 
 })()
