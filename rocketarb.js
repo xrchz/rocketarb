@@ -202,30 +202,11 @@ async function getArbTx(encodedSignedDepositTx) {
 
 async function makeBundle() {
   const encodedSignedDepositTx = getDepositTx()
-  /* verbose logging
-  console.log('Deposit tx parses as')
-  function ppTx(tx) {
-    return [
-      `hash:${tx.hash}`,
-      `to:${tx.to}`,
-      `from:${tx.from}`,
-      `nonce:${tx.nonce}`,
-      `gasLimit:${tx.gasLimit.toString()}`,
-      `maxFeePerGas:${ethers.utils.formatUnits(tx.maxFeePerGas, "gwei")}`,
-      `maxPriorityFeePerGas:${ethers.utils.formatUnits(tx.maxPriorityFeePerGas, "gwei")}`,
-      `data:${tx.data}`,
-      `value:${ethers.utils.formatUnits(tx.value, "ether")}`,
-      `chainId:${tx.chainId}`].join('\n')
-  }
-  console.log(ppTx(ethers.utils.parseTransaction(encodedSignedDepositTx)))
-  */
   const encodedSignedArbTx = await getArbTx(encodedSignedDepositTx)
   const bundle = [
     {signedTransaction: encodedSignedDepositTx},
     {signedTransaction: encodedSignedArbTx}
   ]
-  console.log(`Saving bundle to ${options.bundleFile}`)
-  await fs.writeFile(options.bundleFile, JSON.stringify(bundle))
   return bundle
 }
 
@@ -250,6 +231,10 @@ if (options.premium) {
 
 const bundle = await (options.resumeDeposit ? retrieveDeposit() :
                       options.resume ? retrieveBundle() : makeBundle())
+if (!options.resume) {
+  console.log(`Saving bundle to ${options.bundleFile}`)
+  await fs.writeFile(options.bundleFile, JSON.stringify(bundle))
+}
 
 console.log('waiting for network')
 const network = await provider.getNetwork()
