@@ -75,4 +75,4 @@ created in the deposit pool by your new minipool.
   in the deposit pool, pass the `--no-use-dp` option.
 - Warning: with `--no-flash-loan` there is no check for minimum profit, i.e.,
   the `--gas-refund` option is ignored. Check the premium is healthy (e.g,.
-  >1%) with the `--premium` option first.
+  \>1%) with the `--premium` option first.
