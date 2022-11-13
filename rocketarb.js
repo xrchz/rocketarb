@@ -198,7 +198,7 @@ async function signTx(tx) {
   const fakeSigned = await randomSigner.signTransaction(tx)
   cmd = options.daemon.concat(' api node sign ', fakeSigned.substring(2))
   const signOutput = JSON.parse(execSync(cmd))
-  console.assert(signOutput.status === 'success', `signing transaction failed: ${signOutput.error}`)
+  console.assert(signOutput.status === 'success', `Signing transaction failed: ${signOutput.error}`)
   return signOutput.signedData
 }
 
@@ -328,20 +328,25 @@ if (!options.resume) {
   await fs.writeFile(options.bundleFile, JSON.stringify(bundle))
 }
 
-console.log('waiting for network')
+console.log('Waiting for network')
 const network = await provider.getNetwork()
-console.log(`got ${JSON.stringify(network)}`)
+console.log(`Got ${JSON.stringify(network)}`)
 const flashbotsProvider = await flashbots.FlashbotsBundleProvider.create(
   provider, randomSigner, undefined, network.name)
-console.log('created flashbotsProvider')
+console.log('Created flashbotsProvider')
 
 const currentBlockNumber = await provider.getBlockNumber()
+
+const lastTx = ethers.utils.parseTransaction(bundle.at(-1).signedTransaction)
+const lastTxMaxFee = ethers.utils.formatUnits(lastTx.maxFeePerGas, 'gwei')
+const lastTxMaxPrio = ethers.utils.formatUnits(lastTx.maxPriorityFeePerGas, 'gwei')
+console.log(`Max fee of bundle's last tx: ${lastTxMaxFee} gwei (priority: ${lastTxMaxPrio} gwei)`)
 
 if (options.dryRun) {
   console.log(`Dry run only: using flashbots simulate on one block`)
   const currentBlock = await provider.getBlock(currentBlockNumber)
   const currentBaseFeePerGas = currentBlock.baseFeePerGas
-  console.log(`current base fee ${ethers.utils.formatUnits(currentBaseFeePerGas, 'gwei')} gwei`)
+  console.log(`Current base fee: ${ethers.utils.formatUnits(currentBaseFeePerGas, 'gwei')} gwei`)
   const targetBlockNumber = currentBlockNumber + 1
   console.log(`Target block number: ${targetBlockNumber}`)
   const signedBundle = await flashbotsProvider.signBundle(bundle)
@@ -361,7 +366,7 @@ else {
   for (const [i, targetBlockNumber] of targetBlockNumbers.entries()) {
     const submission = submissions[i]
     const currentBaseFeePerGas = (await provider.getBlock(await provider.getBlockNumber())).baseFeePerGas
-    console.log(`current base fee ${ethers.utils.formatUnits(currentBaseFeePerGas, 'gwei')} gwei`)
+    console.log(`Current base fee: ${ethers.utils.formatUnits(currentBaseFeePerGas, 'gwei')} gwei`)
     console.log(`Target block number: ${targetBlockNumber}`)
     if ('error' in submission) {
       console.log(`RelayResponseError:\n${JSON.stringify(submission)}`)
