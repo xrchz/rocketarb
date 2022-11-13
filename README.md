@@ -63,6 +63,8 @@ created in the deposit pool by your new minipool.
   the index, you can manually decrement it by editing the wallet file. Wasting
   indices is not a problem for your node, however - the generated validator
   keys for an unused index will simply remain unused.
+- It is safe to unexpose your node's RPC port after you're done with
+  `rocketarb` if you prefer leaving it hidden.
 
 ## Do it without a flash loan
 - Pass the `--no-flash-loan` option to use capital (e.g., 16 ETH, or whatever
@@ -71,8 +73,10 @@ created in the deposit pool by your new minipool.
 - Why do this? It could reduce the total gas cost, and thereby increase
   profits. You can control the gas limits with the various `--X-gas-limit`
   options.
-- If you do not have enough capital to additionally cover existing free space
-  in the deposit pool, pass the `--no-use-dp` option.
 - Warning: with `--no-flash-loan` there is no check for minimum profit, i.e.,
   the `--gas-refund` option is ignored. Check the premium is healthy (e.g,.
   \>1%) with the `--premium` option first.
+- By default `rocketarb` tries to arb both the minipool deposit amount and any
+  free space in the deposit pool. If you do not have enough capital to
+  additionally cover the existing free space in the deposit pool, pass the
+  `--no-use-dp` option.
