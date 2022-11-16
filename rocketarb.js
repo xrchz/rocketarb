@@ -238,6 +238,8 @@ async function getArbBundleNoFlash(encodedSignedDepositTx) {
 
   const swapData = await getSwapData(rethAmount, rethAddress, signedDepositTx.from)
   const unsignedSwapTx = {}
+  unsignedSwapTx.to = swapRouterAddress
+  unsignedSwapTx.value = 0
   unsignedSwapTx.type = unsignedApproveTx.type
   unsignedSwapTx.chainId = unsignedApproveTx.chainId
   unsignedSwapTx.nonce = unsignedApproveTx.nonce + 1
