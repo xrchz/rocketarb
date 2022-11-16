@@ -3,64 +3,64 @@
 const { execSync } = require('child_process')
 const { program } = require('commander')
 const https = require('https')
-  const ethers = require('ethers')
-  const flashbots = require('@flashbots/ethers-provider-bundle')
-  const prompt = require('prompt-sync')()
-  const fs = require('fs/promises')
+const ethers = require('ethers')
+const flashbots = require('@flashbots/ethers-provider-bundle')
+const prompt = require('prompt-sync')()
+const fs = require('fs/promises')
 
-  program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
-         .option('-t, --premium', 'print the rETH/ETH primary and secondary rates and exit')
-         .option('-f, --max-fee <maxFee>', 'max transaction fee per gas in gwei')
-         .option('-i, --max-prio <maxPrio>', 'max transaction priority fee per gas in gwei')
-         .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
-         .option('-e, --resume', 'do not create a new bundle, instead submit the one saved in the bundle file')
-         .option('-o, --resume-deposit', 'do not create a new deposit, use the one saved in the bundle file; but recreate the arb transaction')
-         .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', 10)
-         .option('-l, --salt <salt>', 'salt for custom minipool address')
-         .option('-u, --gas-refund <gas>', 'set min-profit to a gas refund of this much gas', 2800000)
-         .option('-g, --gas-limit <gas>', 'gas limit for arbitrage transaction', 990000)
-         .option('-p, --no-use-dp', 'do not include space in the deposit pool in the arb')
-         .option('-d, --daemon <cmd>', 'command (+ args if req) to run the rocketpool smartnode daemon', 'docker exec rocketpool_node /go/bin/rocketpool')
-         .option('-x, --extra-args <args>', 'extra (space-separated) arguments to pass to daemon calls')
-         .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
-         .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
-         .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
-         .option('-y, --no-flash-loan', 'do not use the contract to make a flash loan for the arb: use capital in the node wallet instead')
-         .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571')
-         .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
-         .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --no-flash-loan)', 200000)
-         .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --no-flash-loan)', 80000)
-         .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction (only relevant for --no-flash-loan)', 400000)
-  program.parse()
-  const options = program.opts()
+program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
+       .option('-t, --premium', 'print the rETH/ETH primary and secondary rates and exit')
+       .option('-f, --max-fee <maxFee>', 'max transaction fee per gas in gwei')
+       .option('-i, --max-prio <maxPrio>', 'max transaction priority fee per gas in gwei')
+       .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
+       .option('-e, --resume', 'do not create a new bundle, instead submit the one saved in the bundle file')
+       .option('-o, --resume-deposit', 'do not create a new deposit, use the one saved in the bundle file; but recreate the arb transaction')
+       .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', 10)
+       .option('-l, --salt <salt>', 'salt for custom minipool address')
+       .option('-u, --gas-refund <gas>', 'set min-profit to a gas refund of this much gas', 2800000)
+       .option('-g, --gas-limit <gas>', 'gas limit for arbitrage transaction', 990000)
+       .option('-p, --no-use-dp', 'do not include space in the deposit pool in the arb')
+       .option('-d, --daemon <cmd>', 'command (+ args if req) to run the rocketpool smartnode daemon', 'docker exec rocketpool_node /go/bin/rocketpool')
+       .option('-x, --extra-args <args>', 'extra (space-separated) arguments to pass to daemon calls')
+       .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
+       .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
+       .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
+       .option('-y, --no-flash-loan', 'do not use the contract to make a flash loan for the arb: use capital in the node wallet instead')
+       .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571')
+       .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
+       .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --no-flash-loan)', 200000)
+       .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --no-flash-loan)', 80000)
+       .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction (only relevant for --no-flash-loan)', 400000)
+program.parse()
+const options = program.opts()
 
-  console.log('Welcome to RocketArb: Deposit!')
+console.log('Welcome to RocketArb: Deposit!')
 
-  if (!options.premium && !options.resume && !options.resumeDeposit) {
-    var answer = prompt('Have you done a dry run of depositing your minipool using the smartnode? ')
-    if (!(answer === 'y' || answer === 'yes')) {
-      console.log('Do that first then retry.')
-      process.exit()
-    }
-  }
-
-  if (options.resume && options.resumeDeposit) {
-    console.log('At most one of --resume and --resume-deposit may be given')
+if (!options.premium && !options.resume && !options.resumeDeposit) {
+  var answer = prompt('Have you done a dry run of depositing your minipool using the smartnode? ')
+  if (!(answer === 'y' || answer === 'yes')) {
+    console.log('Do that first then retry.')
     process.exit()
   }
+}
 
-  const oneEther = ethers.utils.parseUnits("1", "ether")
-  const oneGwei = ethers.utils.parseUnits("1", "gwei")
-  const amountWei = oneEther.mul(options.amount)
+if (options.resume && options.resumeDeposit) {
+  console.log('At most one of --resume and --resume-deposit may be given')
+  process.exit()
+}
 
-  const randomSigner = ethers.Wallet.createRandom()
-  const provider = new ethers.providers.JsonRpcProvider(options.rpc)
+const oneEther = ethers.utils.parseUnits("1", "ether")
+const oneGwei = ethers.utils.parseUnits("1", "gwei")
+const amountWei = oneEther.mul(options.amount)
 
-  const ethAddress = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
-  const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
-  const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
-  const spotPriceAddress = '0x07D91f5fb9Bf7798734C3f606dB065549F6893bb'
-  const swapRouterAddress = '0x1111111254fb6c44bAC0beD2854e76F90643097d'
+const randomSigner = ethers.Wallet.createRandom()
+const provider = new ethers.providers.JsonRpcProvider(options.rpc)
+
+const ethAddress = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
+const spotPriceAddress = '0x07D91f5fb9Bf7798734C3f606dB065549F6893bb'
+const swapRouterAddress = '0x1111111254fb6c44bAC0beD2854e76F90643097d'
 
 const rocketContracts = []
 
