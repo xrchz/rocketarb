@@ -16,6 +16,9 @@ any problems!
 5. Run `./rocketarb.js`. It should be fine with no arguments. Pass the `--help`
    to see more options if something goes wrong.
 
+If you have used `rocketarb` before and want to upgrade to the latest version,
+you can simply `git pull` your clone of this repo.
+
 ## What does it do?
 - Ask the smartnode to create a minipool deposit transaction from your node
   account.
