@@ -28,6 +28,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-y, --no-flash-loan', 'do not use the contract to make a flash loan for the arb: use capital in the node wallet instead')
        .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
+       .option('-k, --no-swap-reth', 'keep the minted rETH instead of selling it (only works with --no-flash-loan)')
        .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --no-flash-loan)', 200000)
        .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --no-flash-loan)', 80000)
        .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction (only relevant for --no-flash-loan)', 400000)
@@ -35,6 +36,11 @@ program.parse()
 const options = program.opts()
 
 console.log('Welcome to RocketArb: Deposit!')
+
+if (!options.swapReth && options.flashLoan) {
+  console.log('Invalid options: --flash-loan implies --swap-reth')
+  process.exit()
+}
 
 if (!options.premium && !options.resume && !options.resumeDeposit) {
   var answer = prompt('Have you done a dry run of depositing your minipool using the smartnode? ')
@@ -212,7 +218,7 @@ async function getArbBundleNoFlash(encodedSignedDepositTx) {
   // transactions to bundle after the deposit:
   // 1. deposit ethAmount ETH into deposit pool
   // 2. approve swapRouter to transfer rethAmount
-  // 3. swapTx to swap rETH for ETH (note: not WETH)
+  // 3. (if requested) swapTx to swap rETH for ETH (note: not WETH)
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
   const feeData = getFeeData(signedDepositTx)
@@ -228,39 +234,45 @@ async function getArbBundleNoFlash(encodedSignedDepositTx) {
   unsignedMintTx.maxFeePerGas = feeData.maxFeePerGas
   unsignedMintTx.gasLimit = parseInt(options.mintGasLimit)
 
-  const unsignedApproveTx = await rethContract.populateTransaction.approve(swapRouterAddress, rethAmount)
-  unsignedApproveTx.type = unsignedMintTx.type
-  unsignedApproveTx.chainId = unsignedMintTx.chainId
-  unsignedApproveTx.nonce = unsignedMintTx.nonce + 1
-  unsignedApproveTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas
-  unsignedApproveTx.maxFeePerGas = feeData.maxFeePerGas
-  unsignedApproveTx.gasLimit = parseInt(options.approveGasLimit)
-
-  const swapData = await getSwapData(rethAmount, rethAddress, signedDepositTx.from)
-  const unsignedSwapTx = {}
-  unsignedSwapTx.to = swapRouterAddress
-  unsignedSwapTx.value = 0
-  unsignedSwapTx.type = unsignedApproveTx.type
-  unsignedSwapTx.chainId = unsignedApproveTx.chainId
-  unsignedSwapTx.nonce = unsignedApproveTx.nonce + 1
-  unsignedSwapTx.maxPriorityFeePerGas = unsignedApproveTx.maxPriorityFeePerGas
-  unsignedSwapTx.maxFeePerGas = unsignedApproveTx.maxFeePerGas
-  unsignedSwapTx.data = swapData
-  unsignedSwapTx.gasLimit = parseInt(options.swapGasLimit)
-
   const encodedSignedMintTx = await signTx(unsignedMintTx)
   console.log('Signed mint transaction with smartnode')
-  const encodedSignedApproveTx = await signTx(unsignedApproveTx)
-  console.log('Signed approve transaction with smartnode')
-  const encodedSignedSwapTx = await signTx(unsignedSwapTx)
-  console.log('Signed swap transaction with smartnode')
 
-  return [
+  const bundle = [
     {signedTransaction: encodedSignedDepositTx},
-    {signedTransaction: encodedSignedMintTx},
-    {signedTransaction: encodedSignedApproveTx},
-    {signedTransaction: encodedSignedSwapTx}
+    {signedTransaction: encodedSignedMintTx}
   ]
+
+  if (options.swapReth) {
+    const unsignedApproveTx = await rethContract.populateTransaction.approve(swapRouterAddress, rethAmount)
+    unsignedApproveTx.type = unsignedMintTx.type
+    unsignedApproveTx.chainId = unsignedMintTx.chainId
+    unsignedApproveTx.nonce = unsignedMintTx.nonce + 1
+    unsignedApproveTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas
+    unsignedApproveTx.maxFeePerGas = feeData.maxFeePerGas
+    unsignedApproveTx.gasLimit = parseInt(options.approveGasLimit)
+
+    const encodedSignedApproveTx = await signTx(unsignedApproveTx)
+    console.log('Signed approve transaction with smartnode')
+    bundle.push({signedTransaction: encodedSignedApproveTx})
+
+    const swapData = await getSwapData(rethAmount, rethAddress, signedDepositTx.from)
+    const unsignedSwapTx = {}
+    unsignedSwapTx.to = swapRouterAddress
+    unsignedSwapTx.value = 0
+    unsignedSwapTx.type = unsignedApproveTx.type
+    unsignedSwapTx.chainId = unsignedApproveTx.chainId
+    unsignedSwapTx.nonce = unsignedApproveTx.nonce + 1
+    unsignedSwapTx.maxPriorityFeePerGas = unsignedApproveTx.maxPriorityFeePerGas
+    unsignedSwapTx.maxFeePerGas = unsignedApproveTx.maxFeePerGas
+    unsignedSwapTx.data = swapData
+    unsignedSwapTx.gasLimit = parseInt(options.swapGasLimit)
+
+    const encodedSignedSwapTx = await signTx(unsignedSwapTx)
+    console.log('Signed swap transaction with smartnode')
+    bundle.push({signedTransaction: encodedSignedSwapTx})
+  }
+
+  return bundle
 }
 
 async function getArbTx(encodedSignedDepositTx) {
