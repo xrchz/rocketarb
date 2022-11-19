@@ -57,7 +57,7 @@ if (options.resume && options.resumeDeposit) {
 
 const oneEther = ethers.utils.parseUnits("1", "ether")
 const oneGwei = ethers.utils.parseUnits("1", "gwei")
-const amountWei = oneEther.mul(options.amount)
+const validatorDepositSize = oneEther.mul(32)
 
 const randomSigner = ethers.Wallet.createRandom()
 const provider = new ethers.providers.JsonRpcProvider(options.rpc)
@@ -121,6 +121,7 @@ function getDepositTx() {
   if (options.extraArgs) cmd = cmd.concat(' ', options.extraArgs)
   const salt = options.salt ? parseInt(options.salt, 16) : Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
 
+  const amountWei = oneEther.mul(options.amount)
   cmd = cmd.concat(' api node deposit',
     ' ', ethers.utils.formatUnits(amountWei, "wei"),
     ' ', options.minFee.toString(),
@@ -136,7 +137,8 @@ function getDepositTx() {
   return encodedSignedDepositTx
 }
 
-async function getAmounts(amount) {
+async function getAmounts(minipoolDepositAmount) {
+  const amount = validatorDepositSize.sub(minipoolDepositAmount)
   await populateRocketContracts()
   const [rethAddress, rethContract, depositSettings, rocketDepositPool] = rocketContracts
   const dpFee = await depositSettings.getDepositFee()
