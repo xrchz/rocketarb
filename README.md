@@ -13,8 +13,10 @@ any problems!
 3. Install the requirements on your node machine: `nodejs` (>= 18), and `npm`.
 4. Clone this repo (`git clone https://github.com/xrchz/rocketarb`), `cd
    rocketarb`, and `npm install` to download the js dependencies.
-5. Run `./rocketarb.js`. It should be fine with no arguments. Pass the `--help`
-   to see more options if something goes wrong.
+5. Run `./rocketarb.js`. It should be fine with no arguments.
+   - Pass the `--help` to see more options if something goes wrong.
+   - A typical flow might involve, first: `./rocketarb.js --dry-run`
+   - Then if that succeeds without any reverts: `./rocketarb.js --resume-deposit`
 
 If you have used `rocketarb` before and want to upgrade to the latest version,
 you can simply `git pull` your clone of this repo.
