@@ -85,3 +85,25 @@ created in the deposit pool by your new minipool.
   free space in the deposit pool. If you do not have enough capital to
   additionally cover the existing free space in the deposit pool, pass the
   `--no-use-dp` option.
+
+## Do it without connecting to the smartnode
+By default `rocketarb` uses the smartnode daemon to sign all transactions. For
+security, you can instead use the `--daemon <program>` argument to avoid
+running `rocketarb` on your node. The `<program>` supplied will be called in
+two ways by `rocketarb`, with different arguments:
+
+1. `<program> api node deposit <amount> <commission> <salt> false`
+
+   The program should output a signed minipool deposit transaction (_without_
+   any leading `0x`), just as the smartnode daemon api would output with these
+   arguments. (You could run the smartnode daemon once first to get the data
+   then save it for further use by `rocketarb`.)
+
+2. `<program> api node sign <inputSignedTx>`
+
+   The program should output JSON for an object containing two keys: `{status:
+   "success", signedData: <signedTx>}` where `signedTx` is a version of the
+   transaction represented by `<inputSignedTx>` signed by the account you want
+   to do the non-deposit transactions with. `<inputSignedTx>` is a signed
+   transaction (_without_ the leading `0x`) signed by a random account.
+   `signedTx` should be a string that _includes_ a leading `0x`.
