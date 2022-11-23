@@ -256,8 +256,12 @@ async function getArbBundleNoFlash(encodedSignedDepositTx) {
     const encodedSignedApproveTx = await signTx(unsignedApproveTx)
     console.log('Signed approve transaction with smartnode')
     bundle.push({signedTransaction: encodedSignedApproveTx})
+    const signer = ethers.utils.parseTransaction(encodedSignedApproveTx).from
+    if (signer !== signedDepositTx.from) {
+      console.log(`Detected use of signer ${signer} instead of the smartnode (deposit tx) account`)
+    }
 
-    const swapData = await getSwapData(rethAmount, rethAddress, signedDepositTx.from)
+    const swapData = await getSwapData(rethAmount, rethAddress, signer)
     const unsignedSwapTx = {}
     unsignedSwapTx.to = swapRouterAddress
     unsignedSwapTx.value = 0
@@ -272,6 +276,11 @@ async function getArbBundleNoFlash(encodedSignedDepositTx) {
     const encodedSignedSwapTx = await signTx(unsignedSwapTx)
     console.log('Signed swap transaction with smartnode')
     bundle.push({signedTransaction: encodedSignedSwapTx})
+    const swapSigner = ethers.utils.parseTransaction(encodedSignedSwapTx).from
+    if (swapSigner !== signer) {
+      console.log(`Error: expected signer ${signer} for swap tx but got ${swapSigner}`)
+      process.exit(1)
+    }
   }
 
   return bundle
