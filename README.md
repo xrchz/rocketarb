@@ -6,6 +6,8 @@ Arbitrage rETH mint/burn with minipool deposit/withdrawal
 How to? Here are the steps... Message me on the RocketPool Discord if you have
 any problems!
 
+### Native mode
+
 1. Try almost creating the minipool the normal way with the Rocketpool
    smartnode (>= 1.7.0). Stop before the final `ARE YOU SURE...` prompt and
    cancel it.
@@ -21,6 +23,21 @@ any problems!
 
 If you have used `rocketarb` before and want to upgrade to the latest version,
 you can simply `git pull` your clone of this repo.
+
+### Docker mode
+
+Alternatively, if you have Docker installed, you can run rocketarb with no
+extra dependencies.
+
+1. Try almost creating the minipool the normal way with the Rocketpool
+   smartnode (>= 1.7.0). Stop before the final `ARE YOU SURE...` prompt and
+   cancel it.
+2. Clone this repo (`git clone https://github.com/xrchz/rocketarb`), and
+   `cd rocketarb`.
+3. Run `./scripts/rocketarb-docker.sh`. It should be fine with no arguments.
+   - Pass the `--help` to see more options if something goes wrong.
+   - A typical flow might involve, first: `./scripts/rocketarb-docker.sh --dry-run`
+   - Then if that succeeds without any reverts: `./scripts/rocketarb-docker.sh --resume-deposit`
 
 ## What does it do?
 - Ask the smartnode to create a minipool deposit transaction from your node
