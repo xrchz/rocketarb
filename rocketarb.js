@@ -43,9 +43,9 @@ if (!options.swapReth && options.flashLoan) {
 }
 
 if (!options.premium && !options.resume && !options.resumeDeposit) {
-  var answer = prompt('Have you done a dry run of depositing your minipool using the smartnode? ')
+  var answer = prompt('Have you tried almost depositing your minipool using the smartnode? ')
   if (!(answer === 'y' || answer === 'yes')) {
-    console.log('Do that first then retry.')
+    console.log('Do that first (rocketpool node deposit, but cancel it before completion) then retry.')
     process.exit()
   }
 }
