@@ -6,8 +6,9 @@ Arbitrage rETH mint/burn with minipool deposit/withdrawal
 How to? Here are the steps... Message me on the RocketPool Discord if you have
 any problems!
 
-1. Dry run creating the minipool the normal way with the Rocketpool smartnode
-   (>= 1.7.0). Stop before the final `ARE YOU SURE...` prompt and cancel it.
+1. Try almost creating the minipool the normal way with the Rocketpool
+   smartnode (>= 1.7.0). Stop before the final `ARE YOU SURE...` prompt and
+   cancel it.
 2. Ensure your node's RPC port is exposed locally as described
    [here](https://docs.rocketpool.net/guides/node/advanced-config.html#execution-client).
 3. Install the requirements on your node machine: `nodejs` (>= 18), and `npm`.
