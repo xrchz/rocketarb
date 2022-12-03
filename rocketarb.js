@@ -14,7 +14,6 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-i, --max-prio <maxPrio>', 'max transaction priority fee per gas in gwei')
        .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
        .option('-e, --resume', 'do not create a new bundle, instead submit the one saved in the bundle file')
-       .option('-o, --resume-deposit', 'do not create a new deposit, use the one saved in the bundle file; but recreate the arb transaction')
        .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', 10)
        .option('-l, --salt <salt>', 'salt for custom minipool address')
        .option('-u, --gas-refund <gas>', 'set min-profit to a gas refund of this much gas', 2800000)
@@ -35,29 +34,39 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
 program.parse()
 const options = program.opts()
 
-console.log('Welcome to RocketArb: Deposit!')
-
-if (!options.swapReth && options.flashLoan) {
-  console.log('Invalid options: --flash-loan implies --swap-reth')
-  process.exit()
-}
-
-if (!options.premium && !options.resume && !options.resumeDeposit) {
-  const answer = prompt('Have you tried almost depositing your minipool using the smartnode? ').toLowerCase()
-  if (!(answer === 'y' || answer === 'yes')) {
-    console.log('Do that first (rocketpool node deposit, but cancel it before completion) then retry.')
-    process.exit()
-  }
-}
-
-if (options.resume && options.resumeDeposit) {
-  console.log('At most one of --resume and --resume-deposit may be given')
-  process.exit()
-}
-
 const oneEther = ethers.utils.parseUnits("1", "ether")
 const oneGwei = ethers.utils.parseUnits("1", "gwei")
 const validatorDepositSize = oneEther.mul(32)
+
+console.log('Welcome to RocketArb: Deposit!')
+
+function checkOptions(resumeDeposit) {
+  if (!options.swapReth && options.flashLoan) {
+    console.log('Invalid options: --flash-loan implies --swap-reth')
+    process.exit()
+  }
+
+  if (options.resume && (options.maxFee || options.maxPrioFee || options.salt)) {
+    console.log('Invalid options: cannot specify gas fees or salt with --resume')
+    process.exit()
+  }
+
+  if (!options.premium && !options.resume && !resumeDeposit) {
+    const answer = prompt('Have you tried almost depositing your minipool using the smartnode? ').toLowerCase()
+    if (!(answer === 'y' || answer === 'yes')) {
+      console.log('Do that first (rocketpool node deposit, but cancel it before completion) then retry.')
+      process.exit()
+    }
+  }
+
+  if (options.salt && resumeDeposit) {
+    console.log(`Warning: --salt is ignored when resuming the deposit from ${options.bundleFile}`)
+  }
+
+  if ((options.maxFee || options.maxPrioFee) && resumeDeposit) {
+    console.log(`Specified gas fees will apply to other transactions, but not the deposit resumed from ${options.bundleFile}`)
+  }
+}
 
 const randomSigner = ethers.Wallet.createRandom()
 const provider = new ethers.providers.JsonRpcProvider(options.rpc)
@@ -186,16 +195,16 @@ async function getSwapData(rethAmount, rethAddress, fromAddress) {
   return swap.tx.data
 }
 
-function getFeeData(signedDepositTx) {
+function getFeeData(signedDepositTx, resumedDeposit) {
   // use fee data from deposit tx, but override with options if deposit was resumed
   const feeData = {}
 
   feeData.maxFeePerGas = signedDepositTx.maxFeePerGas
-  if (options.resumeDeposit && options.maxFee)
+  if (resumedDeposit && options.maxFee)
     feeData.maxFeePerGas = ethers.utils.parseUnits(options.maxFee, 'gwei')
 
   feeData.maxPriorityFeePerGas = signedDepositTx.maxPriorityFeePerGas
-  if (options.resumeDeposit && options.maxPrio)
+  if (resumedDeposit && options.maxPrio)
     feeData.maxPriorityFeePerGas = ethers.utils.parseUnits(options.maxPrio, 'gwei')
 
   return feeData
@@ -216,14 +225,14 @@ async function signTx(tx) {
   return signOutput.signedData
 }
 
-async function getArbBundleNoFlash(encodedSignedDepositTx) {
+async function getArbBundleNoFlash(encodedSignedDepositTx, resumedDeposit) {
   // transactions to bundle after the deposit:
   // 1. deposit ethAmount ETH into deposit pool
   // 2. approve swapRouter to transfer rethAmount
   // 3. (if requested) swapTx to swap rETH for ETH (note: not WETH)
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
-  const feeData = getFeeData(signedDepositTx)
+  const feeData = getFeeData(signedDepositTx, resumedDeposit)
 
   const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
   const [ , rethContract, , rocketDepositPool] = rocketContracts
@@ -286,7 +295,7 @@ async function getArbBundleNoFlash(encodedSignedDepositTx) {
   return bundle
 }
 
-async function getArbTx(encodedSignedDepositTx) {
+async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   console.log('Creating arb transaction')
 
   const arbAbi = ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"]
@@ -297,7 +306,7 @@ async function getArbTx(encodedSignedDepositTx) {
   const swapData = await getSwapData(rethAmount, rethAddress)
   const gasRefund = ethers.BigNumber.from(options.gasRefund)
   const minProfit = gasRefund.mul(signedDepositTx.maxFeePerGas)
-  const feeData = getFeeData(signedDepositTx)
+  const feeData = getFeeData(signedDepositTx, resumedDeposit)
 
   const unsignedArbTx = await arbContract.populateTransaction.arb(ethAmount, minProfit, swapData)
   unsignedArbTx.type = 2
@@ -316,7 +325,7 @@ async function getArbTx(encodedSignedDepositTx) {
 async function makeBundle() {
   const encodedSignedDepositTx = getDepositTx()
   if (options.flashLoan) {
-    const encodedSignedArbTx = await getArbTx(encodedSignedDepositTx)
+    const encodedSignedArbTx = await getArbTx(encodedSignedDepositTx, false)
     const bundle = [
       {signedTransaction: encodedSignedDepositTx},
       {signedTransaction: encodedSignedArbTx}
@@ -324,7 +333,7 @@ async function makeBundle() {
     return bundle
   }
   else {
-    return await getArbBundleNoFlash(encodedSignedDepositTx)
+    return await getArbBundleNoFlash(encodedSignedDepositTx, false)
   }
 }
 
@@ -332,11 +341,11 @@ async function retrieveDeposit() {
   console.log(`Resuming using deposit from ${options.bundleFile}`)
   const deposit = JSON.parse(await fs.readFile(options.bundleFile, 'utf-8'))[0]
   if (options.flashLoan) {
-    const arbTx = await getArbTx(deposit.signedTransaction)
+    const arbTx = await getArbTx(deposit.signedTransaction, true)
     return [deposit, {signedTransaction: arbTx}]
   }
   else {
-    return await getArbBundleNoFlash(deposit.signedTransaction)
+    return await getArbBundleNoFlash(deposit.signedTransaction, true)
   }
 }
 
@@ -352,8 +361,15 @@ if (options.premium) {
   return
 }
 
-const bundle = await (options.resumeDeposit ? retrieveDeposit() :
-                      options.resume ? retrieveBundle() : makeBundle())
+const resumeDeposit = await fs.access(options.bundleFile).then(() => !options.resume).catch(() => false)
+
+checkOptions(resumeDeposit)
+
+const bundle = await (
+  options.resume ? retrieveBundle() :
+  resumeDeposit ? retrieveDeposit() :
+  makeBundle()
+)
 if (!options.resume) {
   console.log(`Saving bundle to ${options.bundleFile}`)
   await fs.writeFile(options.bundleFile, JSON.stringify(bundle))

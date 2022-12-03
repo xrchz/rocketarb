@@ -19,7 +19,7 @@ any problems!
 5. Run `./rocketarb.js`. It should be fine with no arguments.
    - Pass the `--help` to see more options if something goes wrong.
    - A typical flow might involve, first: `./rocketarb.js --dry-run`
-   - Then if that succeeds without any reverts: `./rocketarb.js --resume-deposit`
+   - Then if that succeeds without any reverts: `./rocketarb.js`
 
 If you have used `rocketarb` before and want to upgrade to the latest version,
 you can simply `git pull` your clone of this repo.
@@ -37,7 +37,7 @@ extra dependencies.
 3. Run `./scripts/rocketarb-docker.sh`. It should be fine with no arguments.
    - Pass the `--help` to see more options if something goes wrong.
    - A typical flow might involve, first: `./scripts/rocketarb-docker.sh --dry-run`
-   - Then if that succeeds without any reverts: `./scripts/rocketarb-docker.sh --resume-deposit`
+   - Then if that succeeds without any reverts: `./scripts/rocketarb-docker.sh`
 
 ## What does it do?
 - Ask the smartnode to create a minipool deposit transaction from your node
@@ -57,10 +57,10 @@ created in the deposit pool by your new minipool.
 - Try `--rpc http://<your node local ip>:8545` if the default
   (`http://localhost:8545`) does not work.
 - You can try submitting the Flashbots bundle again (in case it failed) without
-  recreating the transactions. Use `--resume-deposit` to only recreate the arb
-  transaction (with fresh 1Inch swap data); use the `--resume` option to
-  recreate neither (i.e., reuse both transactions). (The bundle gets saved in
-  `bundle.json` by default.)
+  recreating the transactions. By default, if the bundle save file exists,
+  `rocketarb` reuses the saved deposit transaction and only recreates the arb
+  transaction (with fresh 1Inch swap data); use the `--resume` option to reuse
+  both transactions. (The bundle gets saved in `bundle.json` by default.)
 - The gas fee needs to be attractive enough for Flashbots to accept the bundle:
   the target block base fee per gas is burned and the block proposer receives
   any additional fee per gas up to the specified maximum priority fee per gas
