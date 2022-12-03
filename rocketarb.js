@@ -43,7 +43,7 @@ if (!options.swapReth && options.flashLoan) {
 }
 
 if (!options.premium && !options.resume && !options.resumeDeposit) {
-  var answer = prompt('Have you tried almost depositing your minipool using the smartnode? ')
+  const answer = prompt('Have you tried almost depositing your minipool using the smartnode? ').toLowerCase()
   if (!(answer === 'y' || answer === 'yes')) {
     console.log('Do that first (rocketpool node deposit, but cancel it before completion) then retry.')
     process.exit()
