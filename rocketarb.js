@@ -388,6 +388,12 @@ if (options.dryRun) {
   console.log(JSON.stringify(simulation, null, 2))
 }
 else {
+  console.log(`This is your last chance to cancel before submitting a bundle of ${bundle.length} transactions.`)
+  const answer = prompt('Are you sure you want to continue? ').toLowerCase()
+  if (!(answer === 'y' || answer === 'yes')) {
+    console.log('Cancelled')
+    process.exit()
+  }
   const maxTries = parseInt(options.maxTries)
   const targetBlockNumbers = []
   const promises = []
