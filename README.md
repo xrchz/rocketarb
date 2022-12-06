@@ -39,6 +39,12 @@ extra dependencies.
    - A typical flow might involve, first: `./scripts/rocketarb-docker.sh --dry-run`
    - Then if that succeeds without any reverts: `./scripts/rocketarb-docker.sh`
 
+If you have used `rocketarb` before and want to upgrade to the latest version,
+you can simply run:
+- `git pull` on your clone of this repo.
+- `./scripts/rocketarb-docker.sh --build` to update the Docker image.
+
+
 ## What does it do?
 - Ask the smartnode to create a minipool deposit transaction from your node
   account.
