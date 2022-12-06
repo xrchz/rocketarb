@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+RP_PROJECT_NAME=${RP_PROJECT_NAME:-rocketpool}
 
 set -e
 
@@ -21,8 +22,8 @@ if ! docker image inspect rocketarb &>/dev/null; then
 fi
 
 # Try to detect Rocket Pool's EC container. If found, attach to its network namespace.
-if docker image inspect rocketpool_eth1 &>/dev/null; then
-	DOCKER_NETWORK="container:rocketpool_eth1"
+if docker container inspect ${RP_PROJECT_NAME}_eth1 &>/dev/null; then
+	DOCKER_NETWORK="container:${RP_PROJECT_NAME}_eth1"
 else
 	DOCKER_NETWORK="host"
 fi
