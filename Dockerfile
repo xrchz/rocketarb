@@ -28,4 +28,4 @@ RUN set -eu \
 
 WORKDIR /work
 
-ENTRYPOINT /app/rocketarb.js
+ENTRYPOINT ["/app/rocketarb.js"]
