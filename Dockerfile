@@ -19,7 +19,9 @@ RUN set -eu \
     && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(grep ^VERSION_CODENAME /etc/os-release | cut -d '=' -f 2) stable" > /etc/apt/sources.list.d/docker.list \
     && apt-get update \
-    && apt-get install -y --no-install-suggests --no-install-recommends docker-ce-cli \
+    && apt-get install -y --no-install-suggests --no-install-recommends \
+        docker-ce-cli \
+        tini \
     # rocketarb
     && npm install \
     # Cleanup
@@ -28,4 +30,4 @@ RUN set -eu \
 
 WORKDIR /work
 
-ENTRYPOINT ["/app/rocketarb.js"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/rocketarb.js"]
