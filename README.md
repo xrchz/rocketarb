@@ -6,7 +6,31 @@ Arbitrage rETH mint/burn with minipool deposit/withdrawal
 How to? Here are the steps... Message me on the RocketPool Discord if you have
 any problems!
 
+### Docker mode
+
+If you have Docker installed, you can run `rocketarb` with no
+extra dependencies.
+
+1. Try almost creating the minipool the normal way with the Rocketpool
+   smartnode (>= 1.7.0). Stop before the final `ARE YOU SURE...` prompt and
+   cancel it.
+2. Clone this repo (`git clone https://github.com/xrchz/rocketarb`), and
+   `cd rocketarb`.
+3. Run `./scripts/rocketarb-docker.sh`. It should be fine with no arguments.
+   - Pass the `--help` to see more options if something goes wrong.
+   - A typical flow might involve, first: `./scripts/rocketarb-docker.sh --dry-run`
+   - Then if that succeeds without any reverts: `./scripts/rocketarb-docker.sh`
+   - If you want to deposit another minipool, delete or move the `bundle.json`
+     file first to avoid trying to resume the previous deposit.
+
+If you have used `rocketarb` before and want to upgrade to the latest version,
+you can simply run:
+- `git pull` on your clone of this repo.
+- `./scripts/rocketarb-docker.sh --build` to update the Docker image.
+
 ### Native mode
+
+Without Docker, the standard way to run `rocketarb` is as follows.
 
 1. Try almost creating the minipool the normal way with the Rocketpool
    smartnode (>= 1.7.0). Stop before the final `ARE YOU SURE...` prompt and
@@ -20,30 +44,11 @@ any problems!
    - Pass the `--help` to see more options if something goes wrong.
    - A typical flow might involve, first: `./rocketarb.js --dry-run`
    - Then if that succeeds without any reverts: `./rocketarb.js`
+   - If you want to deposit another minipool, delete or move the `bundle.json`
+     file first to avoid trying to resume the previous deposit.
 
 If you have used `rocketarb` before and want to upgrade to the latest version,
 you can simply `git pull` your clone of this repo.
-
-### Docker mode
-
-Alternatively, if you have Docker installed, you can run rocketarb with no
-extra dependencies.
-
-1. Try almost creating the minipool the normal way with the Rocketpool
-   smartnode (>= 1.7.0). Stop before the final `ARE YOU SURE...` prompt and
-   cancel it.
-2. Clone this repo (`git clone https://github.com/xrchz/rocketarb`), and
-   `cd rocketarb`.
-3. Run `./scripts/rocketarb-docker.sh`. It should be fine with no arguments.
-   - Pass the `--help` to see more options if something goes wrong.
-   - A typical flow might involve, first: `./scripts/rocketarb-docker.sh --dry-run`
-   - Then if that succeeds without any reverts: `./scripts/rocketarb-docker.sh`
-
-If you have used `rocketarb` before and want to upgrade to the latest version,
-you can simply run:
-- `git pull` on your clone of this repo.
-- `./scripts/rocketarb-docker.sh --build` to update the Docker image.
-
 
 ## What does it do?
 - Ask the smartnode to create a minipool deposit transaction from your node
