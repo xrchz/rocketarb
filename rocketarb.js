@@ -433,9 +433,13 @@ else {
       if (resolution === flashbots.FlashbotsBundleResolution.BlockPassedWithoutInclusion) {
         continue
       }
-      else {
+      else if (resolution === flashbots.FlashbotsBundleResolution.BundleIncluded) {
         console.log('Bundle successfully included on chain!')
-        process.exit(0)
+        process.exit()
+      }
+      else {
+        console.log(`If you are trying to deposit another minipool, (re)move ${options.bundleFile} first.`)
+        process.exit()
       }
     }
   }
