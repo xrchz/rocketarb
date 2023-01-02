@@ -179,7 +179,7 @@ async function getSwapData(rethAmount, rethAddress, fromAddress) {
     const req = https.get(url,
       (res) => {
         if (res.statusCode !== 200) {
-          console.log(`Got ${res.statusCode} from 1inch`)
+          console.log(`Got ${res.statusCode} from 1inch: ${res.statusMessage}`)
           reject(res)
         }
         res.setEncoding('utf8')
