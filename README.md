@@ -1,5 +1,6 @@
 # rocketarb
-Arbitrage rETH mint/burn with minipool deposit/withdrawal
+
+Rocketarb is a third party Rocket Pool tool that operates during Rocket Pool minipool creation. It works by harvesting arbitrage value from the market premium on rEth compared to the creation cost of rEth. Rocketarb uses a flash loan to deposit 16 Eth into the rEth deposit pool at the same time the capacity is available, then selling that 16 Eth on the open market and reaping the arbitrage value. As the market matures, rocketarb will become a valuable tool for stabilizing the market price of rEth. 
 
 ## Arb the rETH premium when you create a minipool!
 
