@@ -1,10 +1,10 @@
 # What is rocketarb?
 
-Rocketarb is a third party Rocket Pool tool that operates during Rocket Pool minipool creation. It works by harvesting arbitrage value from the market premium on rEth compared to the creation cost of rEth. Rocketarb uses a flash loan to deposit 16 Eth into the rEth deposit pool at the same time the capacity is available, then selling that 16 Eth on the open market and reaping the arbitrage value. As the market matures, rocketarb will become a valuable tool for stabilizing the market price of rEth. 
+Rocketarb is a third party Rocket Pool tool that operates during Rocket Pool minipool creation. It works by harvesting arbitrage value from the market premium on rETH compared to the creation cost of rETH. Rocketarb uses a flash loan to deposit 16 ETH into the rETH deposit pool at the same time as the capacity becomes available, then selling that 16 ETH on the open market and reaping the arbitrage value. As the market matures, rocketarb will become a valuable tool for stabilizing the market price of rETH.
 
 ## The Premium LSD
 
-Outside of short-term fluctuations the price of rETH will tend to trade at a premium on secondary markets such as Uniswap or 1inch due to the laws of supply and demand. Demand for rETH is effectively unbounded, while supply will always be limited by minipool operator collateral availability and efficiency. This environment often creates an arbitrage opportunity between the higher price rETH trades at on decentralized exchanges, and the “correct” price calculated by Rocket Pool’s Oracle DAO network which is referred to as the primary, pegged, NAV, or reference price.
+Outside of short-term fluctuations the price of rETH will tend to trade at a premium on secondary markets such as Uniswap or 1inch due to the laws of supply and demand. Demand for rETH is effectively unbounded, while supply will always be limited by minipool operator collateral availability and efficiency. This environment often creates an arbitrage opportunity between the higher price rETH trades at on decentralized exchanges, and the “correct” price calculated by Rocket Pool’s Oracle DAO network which is referred to as the primary, pegged, protocol, NAV, or reference price.
 
 ## Setting the stage
 
@@ -16,16 +16,14 @@ The arbitrage exists every time a new minipool is launched and 16 ETH of space o
 
 ## Gotta go fast
 
-The only way to beat the bots and claim the free ETH for yourself is to complete the entire process in one go - deploy the 16 ETH collateral (plus RPL bond) to launch a new minipool and simultaneously deposit a separate 16 ETH into the depost queue. Rocketarb is a third-party smart contract created by a Rocket Pool community member to do exactly this. While unofficial and not audited, the code is fully open source and has been executed over 600 times during the past two months to generate more than 220 free ETH. In addition, the Rocket Pool team has recognised the value of Rocketarb and is looking to more closely integrate it into the Rocket Pool ecosystem in the future.
+The only way to beat the bots and claim the free ETH for yourself is to complete the entire process in one go - deploy the 16 ETH collateral (plus RPL bond) to launch a new minipool and simultaneously deposit a separate 16 ETH into the depost queue. Rocketarb is a third-party smart contract created by a Rocket Pool community member to do exactly this. While unofficial and not audited, the code is fully open source and has been executed over 600 times during the past two months to generate more than 220 free ETH. In addition, the Rocket Pool team has recognised the value of rocketarb and is looking to more closely integrate it into the Rocket Pool ecosystem in the future.
 
 ## Where to from here
 
-The Rocket Pool protocol continues to evolve over time. In the future when ETH withdrawals are possible and minipool collateral has been reduced the price premium percentage will probably be lower but each new minipool will allow more than 16 ETH to be arbitraged. Rocketarb will likely remain a useful value-creating tool for node operators, and a price-stabilizing tool for rETH. You can learn more about Rocketarb at the following links:
-Rocketscan dashboard by rocketscan.eth: https://rocketscan.io/rocketarb
-RocketArb Watch by 0xhodja.eth: https://rocketarb-watch.netlify.app/
-Rocketarb script by ramana.eth: https://github.com/xrchz/rocketarb/
- 
-
+The Rocket Pool protocol continues to evolve over time. In the future when ETH withdrawals are possible and minipool collateral has been reduced the price premium percentage will probably be lower but each new minipool will allow more than 16 ETH to be arbitraged. Rocketarb will likely remain a useful value-creating tool for node operators, and a price-stabilizing tool for rETH. You can learn more about rocketarb at the following links:
+- Rocketscan dashboard by rocketscan.eth: https://rocketscan.io/rocketarb
+- RocketArb Watch by 0xhodja.eth: https://rocketarb-watch.netlify.app
+- Rocketarb script by ramana.eth: https://github.com/xrchz/rocketarb
 
 # Arb the rETH premium when you create a minipool!
 
