@@ -1,13 +1,38 @@
-# rocketarb
+# What is rocketarb?
 
 Rocketarb is a third party Rocket Pool tool that operates during Rocket Pool minipool creation. It works by harvesting arbitrage value from the market premium on rEth compared to the creation cost of rEth. Rocketarb uses a flash loan to deposit 16 Eth into the rEth deposit pool at the same time the capacity is available, then selling that 16 Eth on the open market and reaping the arbitrage value. As the market matures, rocketarb will become a valuable tool for stabilizing the market price of rEth. 
 
-## Arb the rETH premium when you create a minipool!
+## The Premium LSD
 
-How to? Here are the steps... Message me on the RocketPool Discord if you have
+Outside of short-term fluctuations the price of rETH will tend to trade at a premium on secondary markets such as Uniswap or 1inch due to the laws of supply and demand. Demand for rETH is effectively unbounded, while supply will always be limited by minipool operator collateral availability and efficiency. This environment often creates an arbitrage opportunity between the higher price rETH trades at on decentralized exchanges, and the “correct” price calculated by Rocket Pool’s Oracle DAO network which is referred to as the primary, pegged, NAV, or reference price.
+
+## Setting the stage
+
+A core part of Rocket Pool’s staking design that is relevant to this arbitrage is the deposit queue, where ETH can chill out and await the creation of a new minipool at which point the ETH will be staked and start earning a return. The deposit pool needs to be capped at some nominal size (currently 5000 ETH) because while queued ETH immediately mints new rETH, it is not yet generating yield and hence slightly dilutes the APR of all participants. Because of the high demand for rETH the queue tends to be full more often than not, and when this is the case it means that no more ETH can be deposited until space opens up.
+
+## Highly profitable arbitrage strategy
+
+The arbitrage exists every time a new minipool is launched and 16 ETH of space opens up in the deposit queue while the secondary market price premium prevails. If you deposit 16 ETH to stake it with Rocket Pool and receive rETH in return, you can then immediately turn around and sell that same rETH on secondary markets to get back more ETH than you staked. At the time of writing, the average return is about 2% of 16 ETH, or 0.32 ETH per arbitrage. A free money printer? Sounds good! Well unfortunately the bots think so too, and they are much faster than you.
+
+## Gotta go fast
+
+The only way to beat the bots and claim the free ETH for yourself is to complete the entire process in one go - deploy the 16 ETH collateral (plus RPL bond) to launch a new minipool and simultaneously deposit a separate 16 ETH into the depost queue. Rocketarb is a third-party smart contract created by a Rocket Pool community member to do exactly this. While unofficial and not audited, the code is fully open source and has been executed over 600 times during the past two months to generate more than 220 free ETH. In addition, the Rocket Pool team has recognised the value of Rocketarb and is looking to more closely integrate it into the Rocket Pool ecosystem in the future.
+
+## Where to from here
+
+The Rocket Pool protocol continues to evolve over time. In the future when ETH withdrawals are possible and minipool collateral has been reduced the price premium percentage will probably be lower but each new minipool will allow more than 16 ETH to be arbitraged. Rocketarb will likely remain a useful value-creating tool for node operators, and a price-stabilizing tool for rETH. You can learn more about Rocketarb at the following links:
+Rocketscan dashboard by rocketscan.eth: https://rocketscan.io/rocketarb
+RocketArb Watch by 0xhodja.eth: https://rocketarb-watch.netlify.app/
+Rocketarb script by ramana.eth: https://github.com/xrchz/rocketarb/
+ 
+
+
+# Arb the rETH premium when you create a minipool!
+
+How to? Here are the steps... Message me (ramana#2626) on the RocketPool Discord if you have
 any problems!
 
-### Docker mode
+## Docker mode
 
 If you have Docker installed, you can run `rocketarb` with no
 extra dependencies.
@@ -29,7 +54,7 @@ you can simply run:
 - `git pull` on your clone of this repo.
 - `./scripts/rocketarb-docker.sh --build` to update the Docker image.
 
-### Native mode
+## Native mode
 
 Without Docker, the standard way to run `rocketarb` is as follows.
 
@@ -51,7 +76,7 @@ Without Docker, the standard way to run `rocketarb` is as follows.
 If you have used `rocketarb` before and want to upgrade to the latest version,
 you can simply `git pull` your clone of this repo.
 
-## What does it do?
+# What does it do?
 - Ask the smartnode to create a minipool deposit transaction from your node
   account.
 - Create a transaction to call the rocketarb contract, which will flash loan 16
@@ -63,7 +88,7 @@ you can simply `git pull` your clone of this repo.
 This way you get to benefit from the rETH premium by the space temporarily
 created in the deposit pool by your new minipool.
 
-## Tips
+# Tips
 
 - The smartnode needs to be at least version 1.7.0.
 - Try `--rpc http://<your node local ip>:8545` if the default
@@ -101,7 +126,7 @@ created in the deposit pool by your new minipool.
 - It is safe to unexpose your node's RPC port after you're done with
   `rocketarb` if you prefer leaving it hidden.
 
-## Do it without a flash loan
+# Do it without a flash loan
 - Pass the `--no-flash-loan` option to use capital (e.g., 16 ETH, or whatever
   the `--amount` of your minipool deposit is) in your node account instead of a
   flash loan.
@@ -116,7 +141,7 @@ created in the deposit pool by your new minipool.
   additionally cover the existing free space in the deposit pool, pass the
   `--no-use-dp` option.
 
-## Do it without connecting to the smartnode
+# Do it without connecting to the smartnode
 By default `rocketarb` uses the smartnode daemon to sign all transactions. For
 security, you can instead use the `--daemon <program>` argument to avoid
 running `rocketarb` on your node. The `<program>` supplied will be called in
