@@ -74,7 +74,6 @@ const provider = new ethers.providers.JsonRpcProvider(options.rpc)
 const ethAddress = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
 const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
-const spotPriceAddress = '0x07D91f5fb9Bf7798734C3f606dB065549F6893bb'
 const swapRouterAddress = '0x1111111254fb6c44bAC0beD2854e76F90643097d'
 
 const rocketContracts = []
@@ -106,13 +105,38 @@ async function populateRocketContracts() {
   rocketContracts.push(rocketDepositPool)
 }
 
+function oneInchAPI(method, query) {
+  const queryString = new URLSearchParams(query).toString()
+  const url = `https://api.1inch.io/v4.0/1/${method}?${queryString}`
+  return new Promise((resolve, reject) => {
+    const req = https.get(url,
+      (res) => {
+        if (res.statusCode !== 200) {
+          console.log(`Got ${res.statusCode} from 1inch: ${res.statusMessage}`)
+          reject(res)
+        }
+        res.setEncoding('utf8')
+        let data = ''
+        res.on('data', (chunk) => data += chunk)
+        res.on('end', () => resolve(JSON.parse(data)))
+      })
+    req.on('error', reject)
+  })
+}
+
 async function printPremium() {
   await populateRocketContracts()
   const [rethAddress, rethContract] = rocketContracts
-  const spotPriceContract = new ethers.Contract(spotPriceAddress,
-    ['function getRateToEth(address, bool) view returns (uint256)'], provider);
   const primaryRate = await rethContract.getExchangeRate()
-  const secondaryRate = await spotPriceContract.getRateToEth(rethAddress, true)
+
+  const quoteParams = {
+    fromTokenAddress: rethAddress,
+    toTokenAddress: wethAddress,
+    amount: oneEther.toString(),
+  }
+  const quote = await oneInchAPI('quote', quoteParams)
+  const secondaryRate = ethers.BigNumber.from(quote.toTokenAmount)
+
   const percentage = ethers.utils.formatUnits(
     ((primaryRate.sub(secondaryRate).abs()).mul('100')).mul('1000').div(primaryRate),
     3)
@@ -173,23 +197,7 @@ async function getSwapData(rethAmount, rethAddress, fromAddress) {
     disableEstimate: true
   }
   if (fromAddress) swapParams.gasLimit = options.swapGasLimit
-  const queryString = new URLSearchParams(swapParams).toString()
-  const url = `https://api.1inch.io/v4.0/1/swap?${queryString}`
-  const apiCall = new Promise((resolve, reject) => {
-    const req = https.get(url,
-      (res) => {
-        if (res.statusCode !== 200) {
-          console.log(`Got ${res.statusCode} from 1inch: ${res.statusMessage}`)
-          reject(res)
-        }
-        res.setEncoding('utf8')
-        let data = ''
-        res.on('data', (chunk) => data += chunk)
-        res.on('end', () => resolve(JSON.parse(data)))
-      })
-    req.on('error', reject)
-  })
-  const swap = await apiCall
+  const swap = await oneInchAPI('swap', swapParams)
   if (ethers.utils.getAddress(swap.tx.to) !== swapRouterAddress)
     console.log(`Warning: unexpected to address for swap: ${swap.tx.to}`)
   return swap.tx.data
