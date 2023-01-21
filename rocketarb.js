@@ -310,14 +310,7 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   const arbAbi = ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"]
   const arbContract = new ethers.Contract(options.arbContract, arbAbi, provider)
 
-
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
-  console.log(`Deposit tx from: ${signedDepositTx.from}`)
-  console.log(`gasPrice: ${signedDepositTx.gasPrice.toString()}`)
-  if (!signedDepositTx.maxFeePerGas) {
-    signedDepositTx.maxFeePerGas = ethers.utils.parseUnits('16', 'gwei')
-    signedDepositTx.maxPriorityFeePerGas = ethers.utils.parseUnits('2', 'gwei')
-  }
   const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
   const swapData = await getSwapData(rethAmount, rethAddress)
   const gasRefund = ethers.BigNumber.from(options.gasRefund)
@@ -327,7 +320,7 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   const unsignedArbTx = await arbContract.populateTransaction.arb(ethAmount, minProfit, swapData)
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
-  unsignedArbTx.nonce = 84 // signedDepositTx.nonce + 1
+  unsignedArbTx.nonce = signedDepositTx.nonce + 1
   unsignedArbTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas
   unsignedArbTx.maxFeePerGas = feeData.maxFeePerGas
   unsignedArbTx.gasLimit = parseInt(options.gasLimit)
