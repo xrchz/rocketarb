@@ -25,6 +25,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
        .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
        .option('-y, --no-flash-loan', 'do not use the contract to make a flash loan for the arb: use capital in the node wallet instead')
+       .option('--yes', 'skip all confirmations')
        .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
        .option('-k, --no-swap-reth', 'keep the minted rETH instead of selling it (only works with --no-flash-loan)')
@@ -51,7 +52,7 @@ function checkOptions(resumeDeposit) {
     process.exit()
   }
 
-  if (!options.premium && !options.resume && !resumeDeposit) {
+  if (!options.premium && !options.resume && !resumeDeposit && !options.yes) {
     const answer = prompt('Have you tried almost depositing your minipool using the smartnode? ').toLowerCase()
     if (!(answer === 'y' || answer === 'yes')) {
       console.log('Do that first (rocketpool node deposit, but cancel it before completion) then retry.')
@@ -309,7 +310,14 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   const arbAbi = ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"]
   const arbContract = new ethers.Contract(options.arbContract, arbAbi, provider)
 
+
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
+  console.log(`Deposit tx from: ${signedDepositTx.from}`)
+  console.log(`gasPrice: ${signedDepositTx.gasPrice.toString()}`)
+  if (!signedDepositTx.maxFeePerGas) {
+    signedDepositTx.maxFeePerGas = ethers.utils.parseUnits('16', 'gwei')
+    signedDepositTx.maxPriorityFeePerGas = ethers.utils.parseUnits('2', 'gwei')
+  }
   const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
   const swapData = await getSwapData(rethAmount, rethAddress)
   const gasRefund = ethers.BigNumber.from(options.gasRefund)
@@ -319,7 +327,7 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   const unsignedArbTx = await arbContract.populateTransaction.arb(ethAmount, minProfit, swapData)
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
-  unsignedArbTx.nonce = signedDepositTx.nonce + 1
+  unsignedArbTx.nonce = 84 // signedDepositTx.nonce + 1
   unsignedArbTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas
   unsignedArbTx.maxFeePerGas = feeData.maxFeePerGas
   unsignedArbTx.gasLimit = parseInt(options.gasLimit)
@@ -412,11 +420,13 @@ if (options.dryRun) {
   console.log(JSON.stringify(simulation, null, 2))
 }
 else {
-  console.log(`This is your last chance to cancel before submitting a bundle of ${bundle.length} transactions.`)
-  const answer = prompt('Are you sure you want to continue? ').toLowerCase()
-  if (!(answer === 'y' || answer === 'yes')) {
-    console.log('Cancelled')
-    process.exit()
+  if (!options.yes) {
+    console.log(`This is your last chance to cancel before submitting a bundle of ${bundle.length} transactions.`)
+    const answer = prompt('Are you sure you want to continue? ').toLowerCase()
+    if (!(answer === 'y' || answer === 'yes')) {
+      console.log('Cancelled')
+      process.exit()
+    }
   }
   const maxTries = parseInt(options.maxTries)
   const targetBlockNumbers = []
