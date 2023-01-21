@@ -401,7 +401,8 @@ console.log('Created flashbotsProvider')
 const currentBlockNumber = await provider.getBlockNumber()
 
 const depositTx = ethers.utils.parseTransaction(bundle.at(0).signedTransaction)
-console.log(`Expected minipool address: ${getExpectedMinipoolAddress(depositTx)}`)
+const minipoolAddress = getExpectedMinipoolAddress(depositTx)
+console.log(`Expected minipool address: ${minipoolAddress}`)
 
 const lastTx = ethers.utils.parseTransaction(bundle.at(-1).signedTransaction)
 const lastTxMaxFee = ethers.utils.formatUnits(lastTx.maxFeePerGas, 'gwei')
@@ -453,6 +454,8 @@ else {
       }
       else if (resolution === flashbots.FlashbotsBundleResolution.BundleIncluded) {
         console.log('Bundle successfully included on chain!')
+        console.log(`Moving ${options.bundleFile} to bundle.${minipoolAddress}.json`)
+        await fs.rename(options.bundleFile, `bundle.${minipoolAddress}.json`)
         process.exit()
       }
       else {
