@@ -24,6 +24,7 @@ RUN set -eu \
         tini \
     # rocketarb
     && npm install \
+    && chmod 0755 /app/*.js \
     # Cleanup
     && apt-get remove --purge --auto-remove -y \
     && rm -rf /var/lib/apt/lists/*
