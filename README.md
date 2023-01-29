@@ -44,8 +44,6 @@ extra dependencies.
    - Pass the `--help` to see more options if something goes wrong.
    - A typical flow might involve, first: `./scripts/rocketarb-docker.sh --dry-run`
    - Then if that succeeds without any reverts: `./scripts/rocketarb-docker.sh`
-   - If you want to deposit another minipool, delete or move the `bundle.json`
-     file first to avoid trying to resume the previous deposit.
 
 If you have used `rocketarb` before and want to upgrade to the latest version,
 you can simply run:
@@ -68,8 +66,6 @@ Without Docker, the standard way to run `rocketarb` is as follows.
    - Pass the `--help` to see more options if something goes wrong.
    - A typical flow might involve, first: `./rocketarb.js --dry-run`
    - Then if that succeeds without any reverts: `./rocketarb.js`
-   - If you want to deposit another minipool, delete or move the `bundle.json`
-     file first to avoid trying to resume the previous deposit.
 
 If you have used `rocketarb` before and want to upgrade to the latest version,
 you can simply `git pull` your clone of this repo.
