@@ -229,7 +229,8 @@ async function signTx(tx) {
   // sign randomly first to get around go-ethereum unmarshalling issue
   const fakeSigned = await randomSigner.signTransaction(tx)
   cmd = options.daemon.concat(' api node sign ', fakeSigned.substring(2))
-  const signOutput = JSON.parse(execSync(cmd))
+  const cmdOutput = execSync(cmd)
+  const signOutput = JSON.parse(cmdOutput)
   console.assert(signOutput.status === 'success', `Signing transaction failed: ${signOutput.error}`)
   return signOutput.signedData
 }
