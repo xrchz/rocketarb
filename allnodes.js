@@ -1,5 +1,20 @@
 #!/usr/bin/env node
 
+/**
+   Instructions:
+
+   This script is meant to be run as the daemon for ./rocketarb.js
+   e.g. ./rocketarb.js --daemon ./allnodes.js
+
+   You should complete through step 17 in this guide:
+   https://blog.allnodes.com/a-step-by-step-guide-for-launching-your-own-rocket-pool-minipool-on-allnodes-777c2972526e
+
+   Then, start step 18 but don't submit the deposit transaction. Instead,
+   copy the raw tx calldata and set as an environment variable (ALLNODES_DEPOSIT_CALLDATA)
+   when you run the rocketarb.js script. You will also to set the PRIVATE_KEY envvar, using
+   the private key you just used to register your node and stake RPL on allnodes.
+*/
+
 require('dotenv').config()
 
 const CALLDATA = process.env.ALLNODES_DEPOSIT_CALLDATA
@@ -7,6 +22,7 @@ const PRIVKEY = process.env.PRIVATE_KEY
 const MAXFEE = process.env.MAX_FEE_PER_GAS || '16'
 const PRIOFEE = process.env.MAX_PRIORITY_FEE_PER_GAS || '2'
 const GASLIMIT = process.env.GAS_LIMIT || '2500000'
+const RPCURL = process.env.RPC_URL || 'http://localhost:8545'
 
 const ethers = require('ethers')
 
@@ -18,6 +34,8 @@ if (argv.length < 6 || argv[2] !== 'api' || argv[3] !== 'node' ||
   process.exit(1)
 }
 
+const provider = new ethers.providers.JsonRpcProvider(RPCURL)
+
 function makeAddKey(tx) {
   function addKey(acc, key) { if (key in tx) acc[key] = tx[key]; return acc }
   return addKey
@@ -25,16 +43,18 @@ function makeAddKey(tx) {
 const txFields = "accessList chainId data gasPrice gasLimit maxFeePerGas maxPriorityFeePerGas nonce to type value".split(" ")
 const sigFields = "v r s".split(" ")
 
-const wallet = new ethers.Wallet(PRIVKEY)
+const wallet = new ethers.Wallet(PRIVKEY).connect(provider)
 console.warn(`Created signer for ${wallet.address}`)
 
 async function doSign() {
   const origTx = ethers.utils.parseTransaction(`0x${argv[5]}`)
-  const signedTx = await wallet.signTransaction(txFields.reduce(makeAddKey(origTx), { }))
+  const signedTx = ethers.utils.parseTransaction(
+    await wallet.signTransaction(txFields.reduce(makeAddKey(origTx), { }))
+  )
   console.warn('Signed transaction')
   const addKey = makeAddKey(signedTx)
   const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
-  console.log(`{status: "success", signedData: "${rawTx}"}`)
+  console.log(`{"status": "success", "signedData": "${rawTx}"}`)
 }
 
 async function doDeposit() {
@@ -52,7 +72,7 @@ async function doDeposit() {
     chainId: 1
   }
   const popTx = await wallet.populateTransaction(tx)
-  const signedTx = await wallet.signTransaction(popTx)
+  const signedTx = ethers.utils.parseTransaction(await wallet.signTransaction(popTx))
   console.warn('Signed transaction')
   const addKey = makeAddKey(signedTx)
   const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
