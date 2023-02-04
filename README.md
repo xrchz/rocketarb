@@ -30,7 +30,21 @@ The Rocket Pool protocol continues to evolve over time. In the future when ETH w
 How to? Here are the steps... Message me (ramana#2626) on the RocketPool Discord if you have
 any problems!
 
-## Docker mode
+## First, update to latest version
+
+### Update for Docker Mode
+
+If you have used `rocketarb` before with Docker mode and want to upgrade to the latest version,
+you can simply run:
+- `git pull` on your clone of this repo.
+- `./scripts/rocketarb-docker.sh --build` to update the Docker image.
+
+### Update for Native Mode
+
+If you have used `rocketarb` before with Native mode and want to upgrade to the latest version,
+you can simply `git pull` your clone of this repo.
+
+## Run Rocketarb in Docker mode
 
 If you have Docker installed, you can run `rocketarb` with no
 extra dependencies.
@@ -45,12 +59,7 @@ extra dependencies.
    - A typical flow might involve, first: `./scripts/rocketarb-docker.sh --dry-run`
    - Then if that succeeds without any reverts: `./scripts/rocketarb-docker.sh`
 
-If you have used `rocketarb` before and want to upgrade to the latest version,
-you can simply run:
-- `git pull` on your clone of this repo.
-- `./scripts/rocketarb-docker.sh --build` to update the Docker image.
-
-## Native mode
+## Run Rocketarb in Native mode
 
 Without Docker, the standard way to run `rocketarb` is as follows.
 
@@ -67,17 +76,14 @@ Without Docker, the standard way to run `rocketarb` is as follows.
    - A typical flow might involve, first: `./rocketarb.js --dry-run`
    - Then if that succeeds without any reverts: `./rocketarb.js`
 
-If you have used `rocketarb` before and want to upgrade to the latest version,
-you can simply `git pull` your clone of this repo.
-
 # What does it do?
 - Ask the smartnode to create a minipool deposit transaction from your node
   account.
 - Create a transaction to call the rocketarb contract, which will flash loan 16
-  ETH, deposit it in the Rocket Pool deposit pool (using the newly created
-  space from the minipool deposit), sell the minted rETH using 1Inch, repay the
-  flash loan, and send any profit back to your node account.
-- Submit the two transactions above in a bundle using Flashbots.
+  WETH, unwrap it to native ETH, deposit it in the Rocket Pool deposit pool (using 
+  the newly created space from the minipool deposit), sell the resulting minted rETH using 1Inch, 
+  repay the flash loan, and send any profit back to your node account.
+- Submit the two transactions above in a bundle using Flashbots to prevent frontrunning.
 
 This way you get to benefit from the rETH premium by the space temporarily
 created in the deposit pool by your new minipool.
@@ -113,7 +119,7 @@ created in the deposit pool by your new minipool.
   increase `--gas-refund` accordingly).
 - Every time we ask the smartnode for a deposit transaction, it increments its
   internal validator index (saved in your node's wallet file). If you need to
-  re-run (e.g., to use a different maximum fee per gas) and don't want to waste
+  re-run (e.g. to use a different maximum fee per gas) and don't want to waste
   the index, you can manually decrement it by editing the wallet file. Wasting
   indices is not a problem for your node, however - the generated validator
   keys for an unused index will simply remain unused.
@@ -121,14 +127,14 @@ created in the deposit pool by your new minipool.
   `rocketarb` if you prefer leaving it hidden.
 
 # Do it without a flash loan
-- Pass the `--no-flash-loan` option to use capital (e.g., 16 ETH, or whatever
+- Pass the `--no-flash-loan` option to use capital (e.g. 16 ETH, or whatever
   the `--amount` of your minipool deposit is) in your node account instead of a
   flash loan.
 - Why do this? It could reduce the total gas cost, and thereby increase
   profits. You can control the gas limits with the various `--X-gas-limit`
   options.
-- Warning: with `--no-flash-loan` there is no check for minimum profit, i.e.,
-  the `--gas-refund` option is ignored. Check the premium is healthy (e.g,.
+- Warning: with `--no-flash-loan` there is no check for minimum profit, i.e.
+  the `--gas-refund` option is ignored. Check the premium is healthy (e.g.
   \>1%) with the `--premium` option first.
 - By default `rocketarb` tries to arb both the minipool deposit amount and any
   free space in the deposit pool. If you do not have enough capital to
