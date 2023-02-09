@@ -16,7 +16,7 @@ The arbitrage exists every time a new minipool is launched and 16 ETH of space o
 
 ## Gotta go fast
 
-The only way to beat the bots and claim the free ETH for yourself is to complete the entire process in one go - deploy the 16 ETH collateral (plus RPL bond) to launch a new minipool and simultaneously deposit a separate 16 ETH into the depost queue. Rocketarb is a third-party smart contract created by a Rocket Pool community member to do exactly this. While unofficial and not audited, the code is fully open source and has been executed over 600 times during the past two months to generate more than 220 free ETH. In addition, the Rocket Pool team has recognised the value of rocketarb and is looking to more closely integrate it into the Rocket Pool ecosystem in the future.
+The only way to beat the bots and claim the free ETH for yourself is to complete the entire process in one go - deploy the 16 ETH collateral (plus RPL bond) to launch a new minipool and simultaneously deposit a separate 16 ETH into the deposit queue. Rocketarb is a third-party smart contract created by a Rocket Pool community member to do exactly this. While unofficial and not audited, the code is fully open source and has been executed over 600 times during the past two months to generate more than 220 free ETH. In addition, the Rocket Pool team has recognised the value of rocketarb and is looking to more closely integrate it into the Rocket Pool ecosystem in the future.
 
 ## Where to from here
 
