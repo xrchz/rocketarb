@@ -30,21 +30,7 @@ The Rocket Pool protocol continues to evolve over time. In the future when ETH w
 How to? Here are the steps... Message me (ramana#2626) on the RocketPool Discord if you have
 any problems!
 
-## First, update to latest version
-
-### Update for Docker Mode
-
-If you have used `rocketarb` before with Docker mode and want to upgrade to the latest version,
-you can simply run:
-- `git pull` on your clone of this repo.
-- `./scripts/rocketarb-docker.sh --build` to update the Docker image.
-
-### Update for Native Mode
-
-If you have used `rocketarb` before with Native mode and want to upgrade to the latest version,
-you can simply `git pull` your clone of this repo.
-
-## Run Rocketarb in Docker mode
+## Docker mode
 
 If you have Docker installed, you can run `rocketarb` with no
 extra dependencies.
@@ -59,7 +45,12 @@ extra dependencies.
    - A typical flow might involve, first: `./scripts/rocketarb-docker.sh --dry-run`
    - Then if that succeeds without any reverts: `./scripts/rocketarb-docker.sh`
 
-## Run Rocketarb in Native mode
+If you have used `rocketarb` before and want to upgrade to the latest version,
+you can simply run:
+- `git pull` on your clone of this repo.
+- `./scripts/rocketarb-docker.sh --build` to update the Docker image.
+
+## Native mode
 
 Without Docker, the standard way to run `rocketarb` is as follows.
 
@@ -76,12 +67,15 @@ Without Docker, the standard way to run `rocketarb` is as follows.
    - A typical flow might involve, first: `./rocketarb.js --dry-run`
    - Then if that succeeds without any reverts: `./rocketarb.js`
 
+If you have used `rocketarb` before and want to upgrade to the latest version,
+you can simply `git pull` your clone of this repo.
+
 # What does it do?
 - Ask the smartnode to create a minipool deposit transaction from your node
   account.
 - Create a transaction to call the rocketarb contract, which will flash loan 16
-  WETH, unwrap it to native ETH, deposit it in the Rocket Pool deposit pool (using 
-  the newly created space from the minipool deposit), sell the resulting minted rETH using 1Inch, 
+  WETH, unwrap it to native ETH, deposit it in the Rocket Pool deposit pool (using the 
+  newly created space from the minipool deposit), sell the resulting minted rETH using 1Inch, 
   repay the flash loan, and send any profit back to your node account.
 - Submit the two transactions above in a bundle using Flashbots to prevent frontrunning.
 
