@@ -175,36 +175,34 @@ function makeAddKey(tx) {
 const txFields = "accessList chainId data gasPrice gasLimit maxFeePerGas maxPriorityFeePerGas nonce to type value".split(" ")
 const sigFields = "v r s".split(" ")
 function runCmd(cmd) {
-  if (options.daemon === 'interactive') {
-    const args = cmd.split(' ')
-    args.shift()
-    if (args[4] === 'sign') {
-      const origTx = ethers.utils.parseTransaction(`0x${args[5]}`)
-      const toSign = txFields.reduce(makeAddKey(origTx), { })
-      console.log(`After the > please sign ${JSON.stringify(toSign)}`)
-      const signedTx = ethers.utils.parseTransaction(prompt('> '))
-      const addKey = makeAddKey(signedTx)
-      const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
-      return `{"status": "success", "signedData": "${rawTx}"}`
-    }
-    else {
-      console.log(`After the > please paste the deposit calldata for ${cmd}`)
-      const calldata = prompt('> ')
-      const toSign = {
-        to: rocketContracts[4],
-        value: ethers.BigNumber.from(args[5]),
-        data: calldata
-      }
-      console.log(`After the > please populate and sign ${JSON.stringify(toSign)}`)
-      const signedTx = ethers.utils.parseTransaction(prompt('> '))
-      const addKey = makeAddKey(signedTx)
-      const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
-      return rawTx.substring(2)
-    }
-  }
-  else {
+  if (options.daemon !== 'interactive') {
     return execSync(cmd)
   }
+
+  const args = cmd.split(' ')
+  args.shift()
+  if (args[4] === 'sign') {
+    const origTx = ethers.utils.parseTransaction(`0x${args[5]}`)
+    const toSign = txFields.reduce(makeAddKey(origTx), { })
+    console.log(`After the > please sign ${JSON.stringify(toSign)}`)
+    const signedTx = ethers.utils.parseTransaction(prompt('> '))
+    const addKey = makeAddKey(signedTx)
+    const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
+    return `{"status": "success", "signedData": "${rawTx}"}`
+  }
+
+  console.log(`After the > please paste the deposit calldata for ${cmd}`)
+  const calldata = prompt('> ')
+  const toSign = {
+    to: rocketContracts[4],
+    value: ethers.BigNumber.from(args[5]),
+    data: calldata
+  }
+  console.log(`After the > please populate and sign ${JSON.stringify(toSign)}`)
+  const signedTx = ethers.utils.parseTransaction(prompt('> '))
+  const addKey = makeAddKey(signedTx)
+  const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
+  return rawTx.substring(2)
 }
 
 function getDepositTx() {
