@@ -180,9 +180,10 @@ function runCmd(cmd) {
   }
 
   const args = cmd.split(' ')
-  args.shift()
-  if (args[4] === 'sign') {
-    const origTx = ethers.utils.parseTransaction(`0x${args[5]}`)
+  while (args.shift() !== 'api') {}
+  if (args.shift() !== 'node') throw new Error('catastrophic failure')
+  if (args[0] === 'sign') {
+    const origTx = ethers.utils.parseTransaction(`0x${args[1]}`)
     const toSign = txFields.reduce(makeAddKey(origTx), { })
     console.log(`After the > please sign ${JSON.stringify(toSign)}`)
     const signedTx = ethers.utils.parseTransaction(prompt('> '))
@@ -195,7 +196,7 @@ function runCmd(cmd) {
   const calldata = prompt('> ')
   const toSign = {
     to: rocketContracts[4],
-    value: ethers.BigNumber.from(args[5]),
+    value: ethers.BigNumber.from(args[1]),
     data: calldata
   }
   console.log(`After the > please populate and sign ${JSON.stringify(toSign)}`)
