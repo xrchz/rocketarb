@@ -182,13 +182,14 @@ function runCmd(cmd) {
   const args = cmd.split(' ')
   while (args.shift() !== 'api') {}
   if (args.shift() !== 'node') throw new Error('catastrophic failure')
+
   if (args[0] === 'sign') {
     const origTx = ethers.utils.parseTransaction(`0x${args[1]}`)
     const toSign = txFields.reduce(makeAddKey(origTx), { })
-    console.log(`After the > please sign ${JSON.stringify(toSign)}`)
-    const signedTx = ethers.utils.parseTransaction(prompt('> '))
-    const addKey = makeAddKey(signedTx)
-    const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
+    console.log(`After the > please provide missing (i.e. signature) fields for ${JSON.stringify(toSign)}`)
+    const sigFields = JSON.parse(prompt('> '))
+    const addKey = makeAddKey(sigFields)
+    const rawTx = ethers.utils.serializeTransaction(toSign, sigFields.reduce(addKey, { }))
     return `{"status": "success", "signedData": "${rawTx}"}`
   }
 
@@ -199,9 +200,9 @@ function runCmd(cmd) {
     value: ethers.BigNumber.from(args[1]),
     data: calldata
   }
-  console.log(`After the > please populate and sign ${JSON.stringify(toSign)}`)
-  const signedTx = ethers.utils.parseTransaction(prompt('> '))
-  const addKey = makeAddKey(signedTx)
+  console.log(`After the > please provide missing (incl. signature) fields for ${JSON.stringify(toSign)}`)
+  const moreFields = JSON.parse(prompt('> '))
+  const addKey = makeAddKey({...toSign, ...moreFields})
   const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
   return rawTx.substring(2)
 }
