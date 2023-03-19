@@ -185,9 +185,16 @@ function runCmd(cmd) {
 
   if (args[0] === 'sign') {
     const origTx = ethers.utils.parseTransaction(`0x${args[1]}`)
+    // revert down to type 0 since trezor doesn't support type 2
+    delete origTx.type
+    origTx.gasPrice = origTx.maxFeePerGas
+    delete origTx.maxFeePerGas
+    delete origTx.maxPriorityFeePerGas
+    delete origTx.accessList
     const toSign = txFields.reduce(makeAddKey(origTx), { })
     console.log(`After the > please provide missing (i.e. signature) fields for ${JSON.stringify(toSign)}`)
     const moreFields = JSON.parse(prompt('> '))
+    moreFields.v = parseInt(moreFields.v)
     const addKey = makeAddKey(moreFields)
     const rawTx = ethers.utils.serializeTransaction(toSign, sigFields.reduce(addKey, { }))
     return `{"status": "success", "signedData": "${rawTx}"}`
@@ -200,13 +207,16 @@ function runCmd(cmd) {
     value: ethers.BigNumber.from(args[1]),
     data: calldata,
     gasLimit: ethers.BigNumber.from(options.depositGasLimit),
-    maxFeePerGas: ethers.utils.parseUnits(options.maxFee || '16', 'gwei'),
-    maxPriorityFeePerGas: ethers.utils.parseUnits(options.maxPrio || '2', 'gwei'),
-    type: 2,
+    // maxFeePerGas: ethers.utils.parseUnits(options.maxFee || '16', 'gwei'),
+    // maxPriorityFeePerGas: ethers.utils.parseUnits(options.maxPrio || '2', 'gwei'),
+    // type: 2,
+    // since trezor doesn't work with type 2, we use this instead:
+    gasPrice: ethers.utils.parseUnits(options.maxFee || '16', 'gwei'),
     chainId: 1
   }
   console.log(`After the > please provide missing (incl. signature) fields for ${JSON.stringify(toSign)}`)
   const moreFields = JSON.parse(prompt('> '))
+  moreFields.v = parseInt(moreFields.v)
   const addKey = makeAddKey({...toSign, ...moreFields})
   const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
   return rawTx.substring(2)
