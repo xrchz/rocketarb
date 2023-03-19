@@ -49,6 +49,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --funding-method self)', 220000)
        .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --funding-method self)', 80000)
        .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction (only relevant for --funding-method self)', 400000)
+       .option('-gd, --deposit-gas-limit <gas>', 'gas limit for deposit transaction (only relevant when using --interactive)', 2500000)
 program.parse()
 const options = program.opts()
 
@@ -199,6 +200,11 @@ function runCmd(cmd) {
     to: rocketContracts[4],
     value: ethers.BigNumber.from(args[1]),
     data: calldata
+    gasLimit: ethers.BigNumber.from(options.depositGasLimit)
+    maxFeePerGas: ethers.utils.parseUnits(options.maxFee || '16', 'gwei')
+    maxPriorityFeePerGas: ethers.utils.parseUnits(options.maxPrio || '2', 'gwei')
+    type: 2
+    chainId: 1
   }
   console.log(`After the > please provide missing (incl. signature) fields for ${JSON.stringify(toSign)}`)
   const moreFields = JSON.parse(prompt('> '))
