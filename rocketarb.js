@@ -35,20 +35,20 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
          .choices(['flashLoan', 'uniswap', 'self'])
          .default("flashLoan")
        )
-       
        // options for --funding-method flashLoan'
        .option('-b, --arb-contract <addr>', 'contract address to use when --funding-method = flashLoan', '0xE46BFe6F559041cc1323dB3503a09c49fb5d8828')
 
        // options for --funding-method uniswap'
        .option('-ub, --uni-arb-contract <addr>', 'contract address to use when --funding-method = uniswap', '0x6fCfE8c6e35fab88e0BecB3427e54c8c9847cdc2')
        .option('-up, --uni-pool <address>', 'Uniswap pool to swap on when --funding-method = uniswap', '0xa4e0faa58465a2d369aa21b3e42d43374c6f9613')
-       
+
        // options for --funding-method self'
        .addOption(new Option('-y, --no-flash-loan', 'deprecated. use `--funding-method self` instead').implies({fundingMethod: 'self' }))
        .option('-k, --no-swap-reth', 'keep the minted rETH instead of selling it (only works with --funding-method self)')
        .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --funding-method self)', 220000)
        .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --funding-method self)', 80000)
        .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction (only relevant for --funding-method self)', 400000)
+       .option('-gd, --deposit-gas-limit <gas>', 'gas limit for deposit transaction (only relevant when using --interactive)', 2500000)
 program.parse()
 const options = program.opts()
 
@@ -199,6 +199,11 @@ function runCmd(cmd) {
     to: rocketContracts[4],
     value: ethers.BigNumber.from(args[1]),
     data: calldata
+    gasLimit: ethers.BigNumber.from(options.depositGasLimit)
+    maxFeePerGas: ethers.utils.parseUnits(options.maxFee || '16', 'gwei')
+    maxPriorityFeePerGas: ethers.utils.parseUnits(options.maxPrio || '2', 'gwei')
+    type: 2
+    chainId: 1
   }
   console.log(`After the > please provide missing (incl. signature) fields for ${JSON.stringify(toSign)}`)
   const moreFields = JSON.parse(prompt('> '))
@@ -369,7 +374,7 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   console.log('Creating arb transaction')
 
   const arbAbi = ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"]
-  
+
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
   const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
