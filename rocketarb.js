@@ -188,8 +188,8 @@ function runCmd(cmd) {
     const origTx = ethers.utils.parseTransaction(`0x${args[1]}`)
     const toSign = txFields.reduce(makeAddKey(origTx), { })
     console.log(`After the > please provide missing (i.e. signature) fields for ${JSON.stringify(toSign)}`)
-    const sigFields = JSON.parse(prompt('> '))
-    const addKey = makeAddKey(sigFields)
+    const moreFields = JSON.parse(prompt('> '))
+    const addKey = makeAddKey(moreFields)
     const rawTx = ethers.utils.serializeTransaction(toSign, sigFields.reduce(addKey, { }))
     return `{"status": "success", "signedData": "${rawTx}"}`
   }
@@ -199,11 +199,11 @@ function runCmd(cmd) {
   const toSign = {
     to: rocketContracts[4],
     value: ethers.BigNumber.from(args[1]),
-    data: calldata
-    gasLimit: ethers.BigNumber.from(options.depositGasLimit)
-    maxFeePerGas: ethers.utils.parseUnits(options.maxFee || '16', 'gwei')
-    maxPriorityFeePerGas: ethers.utils.parseUnits(options.maxPrio || '2', 'gwei')
-    type: 2
+    data: calldata,
+    gasLimit: ethers.BigNumber.from(options.depositGasLimit),
+    maxFeePerGas: ethers.utils.parseUnits(options.maxFee || '16', 'gwei'),
+    maxPriorityFeePerGas: ethers.utils.parseUnits(options.maxPrio || '2', 'gwei'),
+    type: 2,
     chainId: 1
   }
   console.log(`After the > please provide missing (incl. signature) fields for ${JSON.stringify(toSign)}`)
