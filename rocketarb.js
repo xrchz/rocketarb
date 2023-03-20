@@ -399,7 +399,7 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
     ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [options.uniPool, rethAmount]) :
     await getSwapData(rethAmount, rethAddress)
   const gasRefund = ethers.BigNumber.from(options.gasRefund)
-  const minProfit = gasRefund.mul(signedDepositTx.maxFeePerGas)
+  const minProfit = gasRefund.mul(signedDepositTx.maxFeePerGas || signedDepositTx.gasPrice)
   const feeData = getFeeData(signedDepositTx, resumedDeposit)
 
   const arbContract = new ethers.Contract(useUniswap ? options.uniArbContract : options.arbContract, arbAbi, provider)
