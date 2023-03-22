@@ -7,6 +7,7 @@ const ethers = require('ethers')
 const flashbots = require('@flashbots/ethers-provider-bundle')
 const prompt = require('prompt-sync')()
 const fs = require('fs/promises')
+const EthereumTx = require('@ethereumjs/tx');
 
 program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-t, --premium', 'print the rETH/ETH primary and secondary rates and exit')
@@ -174,6 +175,7 @@ function makeAddKey(tx) {
 }
 const txFields = "accessList chainId data gasPrice gasLimit maxFeePerGas maxPriorityFeePerGas nonce to type value".split(" ")
 const sigFields = "v r s".split(" ")
+const removeBNs = x => Object.fromEntries(Object.entries(x).map(([k, v]) => [k, ethers.BigNumber.isBigNumber(v) ? v.toHexString() : v]))
 function runCmd(cmd) {
   if (options.daemon !== 'interactive') {
     return execSync(cmd)
@@ -196,7 +198,12 @@ function runCmd(cmd) {
     const moreFields = JSON.parse(prompt('> '))
     moreFields.v = parseInt(moreFields.v)
     const addKey = makeAddKey(moreFields)
-    const rawTx = ethers.utils.serializeTransaction(toSign, sigFields.reduce(addKey, { }))
+    const toSign_for_ejs = removeBNs(toSign)
+    // const rawTx_ethers = ethers.utils.serializeTransaction(toSign, sigFields.reduce(addKey, { }))
+    const rawTxUnserialized = EthereumTx.Transaction.fromTxData({...toSign_for_ejs, ...(sigFields.reduce(addKey, { }))})
+    const rawTx = `0x${rawTxUnserialized.serialize().toString('hex')}`
+    // console.log(`rawTx_ethers: ${rawTx_ethers}`)
+    // console.log(`rawTx_ejs: ${rawTx}`)
     return `{"status": "success", "signedData": "${rawTx}"}`
   }
 
@@ -218,7 +225,14 @@ function runCmd(cmd) {
   const moreFields = JSON.parse(prompt('> '))
   moreFields.v = parseInt(moreFields.v)
   const addKey = makeAddKey({...toSign, ...moreFields})
-  const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
+  const tx1 = txFields.reduce(addKey, { })
+  const sig1 = sigFields.reduce(addKey, { })
+  // const rawTx_ethers = ethers.utils.serializeTransaction(tx1, sig1)
+  const tx1_for_ejs = removeBNs(tx1)
+  const signedTx = EthereumTx.Transaction.fromTxData({ ...tx1_for_ejs, ...sig1 });
+  const rawTx = `0x${signedTx.serialize().toString('hex')}`
+  // console.log(`rawTx_ethers: ${rawTx_ethers}`)
+  // console.log(`rawTx_ejs: ${rawTx}`)
   return rawTx.substring(2)
 }
 
@@ -485,8 +499,8 @@ const minipoolAddress = getExpectedMinipoolAddress(depositTx)
 console.log(`Expected minipool address: ${minipoolAddress}`)
 
 const lastTx = ethers.utils.parseTransaction(bundle.at(-1).signedTransaction)
-const lastTxMaxFee = ethers.utils.formatUnits(lastTx.maxFeePerGas, 'gwei')
-const lastTxMaxPrio = ethers.utils.formatUnits(lastTx.maxPriorityFeePerGas, 'gwei')
+const lastTxMaxFee = ethers.utils.formatUnits(lastTx.maxFeePerGas || lastTx.gasPrice, 'gwei')
+const lastTxMaxPrio = ethers.utils.formatUnits(lastTx.maxPriorityFeePerGas || 0, 'gwei')
 console.log(`Max fee of bundle's last tx: ${lastTxMaxFee} gwei (priority: ${lastTxMaxPrio} gwei)`)
 
 if (options.dryRun) {
