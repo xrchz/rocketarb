@@ -315,7 +315,14 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
   const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
-  const swapData = options.arbContract === rocketUniArbAddress ?
+  const useUniswap = options.arbContract === rocketUniArbAddress
+  if (useUniswap) {
+    console.log('Using RocketUniArb for arbitrage via a Uniswap flash swap')
+  }
+  else {
+    console.log(`Using RocketDepositArbitrage contract ${options.arbContract}`)
+  }
+  const swapData = useUniswap ?
     ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [options.uniPool, rethAmount]) :
     await getSwapData(rethAmount, rethAddress)
   const gasRefund = ethers.BigNumber.from(options.gasRefund)
