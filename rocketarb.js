@@ -190,11 +190,6 @@ async function getAmounts(minipoolDepositAmount) {
 }
 
 async function getSwapData(rethAmount, rethAddress, fromAddress) {
-  if (options.arbContract === rocketUniArbAddress) {
-    return ethers.utils.defaultAbiCoder.encode(
-      ["address", "uint256"],
-      [options.uniPool, rethAmount])
-  }
   const swapParams = {
     fromTokenAddress: rethAddress,
     toTokenAddress: fromAddress ? ethAddress : wethAddress,
@@ -320,7 +315,9 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
   const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
-  const swapData = await getSwapData(rethAmount, rethAddress)
+  const swapData = options.arbContract === rocketUniArbAddress ?
+    ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [options.uniPool, rethAmount]) :
+    await getSwapData(rethAmount, rethAddress)
   const gasRefund = ethers.BigNumber.from(options.gasRefund)
   const minProfit = gasRefund.mul(signedDepositTx.maxFeePerGas)
   const feeData = getFeeData(signedDepositTx, resumedDeposit)
