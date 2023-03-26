@@ -28,6 +28,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('--yes', 'skip all confirmations')
        .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
+       .option('-up, --uni-pool <address>', 'Uniswap pool to use when using RocketUniArb', '0xa4e0faa58465a2d369aa21b3e42d43374c6f9613')
        .option('-k, --no-swap-reth', 'keep the minted rETH instead of selling it (only works with --no-flash-loan)')
        .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --no-flash-loan)', 220000)
        .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --no-flash-loan)', 80000)
@@ -76,6 +77,7 @@ const ethAddress = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
 const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
 const swapRouterAddress = '0x1111111254fb6c44bAC0beD2854e76F90643097d'
+const rocketUniArbAddress = '0x6fCfE8c6e35fab88e0BecB3427e54c8c9847cdc2'
 
 const rocketContracts = []
 
@@ -188,6 +190,11 @@ async function getAmounts(minipoolDepositAmount) {
 }
 
 async function getSwapData(rethAmount, rethAddress, fromAddress) {
+  if (options.arbContract === rocketUniArbAddress) {
+    return ethers.utils.defaultAbiCoder.encode(
+      ["address", "uint256"],
+      [options.uniPool, rethAmount])
+  }
   const swapParams = {
     fromTokenAddress: rethAddress,
     toTokenAddress: fromAddress ? ethAddress : wethAddress,
