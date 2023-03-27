@@ -120,20 +120,43 @@ created in the deposit pool by your new minipool.
 - It is safe to unexpose your node's RPC port after you're done with
   `rocketarb` if you prefer leaving it hidden.
 
-# Do it without a flash loan
-- Pass the `--no-flash-loan` option to use capital (e.g. 16 ETH, or whatever
-  the `--amount` of your minipool deposit is) in your node account instead of a
-  flash loan.
-- Why do this? It could reduce the total gas cost, and thereby increase
-  profits. You can control the gas limits with the various `--X-gas-limit`
+# Control how the transaction is funded
+Pass the `--funding-method` option to control how the arb is funded:
+- `--funding-method uniswap` (the default) will swap directly with a Uniswap
+  pool, getting a flash loan from the pool and using it to fund the rEth
+  deposit. This is relatively cheap on gas, so it's more efficient when the
+  premium is small.
+- `--funding-method flashLoan` will take out a dedicated flash loan, and
+  then use the loaned funds for the arbitrage. The swap is done via
+  1inch, ensuring an optimal route.
+- `--funding-method self` will use funds in the local wallet to fund the
+  arbitrage.
+
+Why choose one over another? Each has tradeoffs:
+- `self` and `flashLoan` allow more flexibility in the route the swap takes,
+  so big swaps might give more optimal arbs with these two options. 
+- `self` and `uniswap` don't require an explicit flash loan step, reducing
+  gas costs.
+- `self` allows you to keep the minted rEth for yourself, rather than
+  selling it back for a profit
+
+Our overall recommendation is:
+- use `uniswap` if the premium is small (less than 0.5% or so) to keep gas
+  costs down
+- use `flashLoan` when the premium is larger to ensure an optimal swap
+- use `self` if you have the funds and want to do something special like
+  keep the minted rEth for yourself.
+
+# Additional funding notes
+- You can control the gas limits with the various `--X-gas-limit`
   options.
-- Warning: with `--no-flash-loan` there is no check for minimum profit, i.e.
-  the `--gas-refund` option is ignored. Check the premium is healthy (e.g.
-  \>1%) with the `--premium` option first.
+- Warning: with `--funding-method self` there is no check for minimum profit,
+  i.e. the `--gas-refund` option is ignored. Check the premium is healthy
+  (e.g. \>1%) with the `--premium` option first.
 - By default `rocketarb` tries to arb both the minipool deposit amount and any
-  free space in the deposit pool. If you do not have enough capital to
-  additionally cover the existing free space in the deposit pool, pass the
-  `--no-use-dp` option.
+  free space in the deposit pool. With `--funding-method self`, if you do not
+  have enough capital to additionally cover the existing free space in the
+  deposit pool, pass the `--no-use-dp` option.
 
 # Do it without connecting to the smartnode
 By default `rocketarb` uses the smartnode daemon to sign all transactions. For
