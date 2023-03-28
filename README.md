@@ -123,7 +123,7 @@ created in the deposit pool by your new minipool.
 # Control how the transaction is funded
 Pass the `--funding-method` option to control how the arb is funded:
 - `--funding-method uniswap` (the default) will swap directly with a Uniswap
-  pool, getting a flash loan from the pool and using it to fund the rEth
+  pool, getting a flash loan from the pool and using it to fund the rETH
   deposit. This is relatively cheap on gas, so it's more efficient when the
   premium is small.
 - `--funding-method flashLoan` will take out a dedicated flash loan, and
@@ -137,7 +137,7 @@ Why choose one over another? Each has tradeoffs:
   so big swaps might give more optimal arbs with these two options. 
 - `self` and `uniswap` don't require an explicit flash loan step, reducing
   gas costs.
-- `self` allows you to keep the minted rEth for yourself, rather than
+- `self` allows you to keep the minted rETH for yourself, rather than
   selling it back for a profit
 
 Our overall recommendation is:
@@ -145,7 +145,7 @@ Our overall recommendation is:
   costs down
 - use `flashLoan` when the premium is larger to ensure an optimal swap
 - use `self` if you have the funds and want to do something special like
-  keep the minted rEth for yourself.
+  keep the minted rETH for yourself.
 
 # Additional funding notes
 - You can control the gas limits with the various `--X-gas-limit`

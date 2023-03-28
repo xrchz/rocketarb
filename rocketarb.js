@@ -27,9 +27,9 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
        .option('--yes', 'skip all confirmations')
        .addOption(
-          new Option('-fm, --funding-method <method>', 'the method to ue for funding the arbitrage.\n\
+          new Option('-fm, --funding-method <method>', 'the method to use for funding the arbitrage.\n\
   - with `flashLoan`, we take out an eth flash loan and then swap through whichever route gives the best arb.\n\
-  - with `uniswap`, we swap directly through a weth <-> rEth uniswap v3 pool, using the pool\'s flash loan functionaity.\n\
+  - with `uniswap`, we swap directly through a WETH <-> rETH uniswap v3 pool, using the pool\'s flash loan functionaity.\n\
   - with `self` we use eth in the local wallet to fund the arbitrage'
   )
          .choices(['flashLoan', 'uniswap', 'self'])
