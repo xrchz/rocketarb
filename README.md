@@ -122,13 +122,13 @@ created in the deposit pool by your new minipool.
 
 # Control how the transaction is funded
 Pass the `--funding-method` option to control how the arb is funded:
-- `--funding-method uniswap` (the default) will swap directly with a Uniswap
+- `--funding-method flashLoan` (the default) will take out a dedicated flash loan, and
+  then use the loaned funds for the arbitrage. The swap is done via
+  1inch, ensuring an optimal route.
+- `--funding-method uniswap` will swap directly with a Uniswap
   pool, getting a flash loan from the pool and using it to fund the rETH
   deposit. This is relatively cheap on gas, so it's more efficient when the
   premium is small.
-- `--funding-method flashLoan` will take out a dedicated flash loan, and
-  then use the loaned funds for the arbitrage. The swap is done via
-  1inch, ensuring an optimal route.
 - `--funding-method self` will use funds in the local wallet to fund the
   arbitrage.
 

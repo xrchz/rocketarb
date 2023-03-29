@@ -33,7 +33,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
   - with `self` we use eth in the local wallet to fund the arbitrage'
   )
          .choices(['flashLoan', 'uniswap', 'self'])
-         .default("uniswap")
+         .default("flashLoan")
        )
        
        // options for --funding-method flashLoan'
