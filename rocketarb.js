@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const { execSync } = require('child_process')
-const { program } = require('commander')
+const { program, Option } = require('commander')
 const https = require('https')
 const ethers = require('ethers')
 const flashbots = require('@flashbots/ethers-provider-bundle')
@@ -24,15 +24,31 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
        .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
        .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
-       .option('-y, --no-flash-loan', 'do not use the contract to make a flash loan for the arb: use capital in the node wallet instead')
-       .option('--yes', 'skip all confirmations')
-       .option('-b, --arb-contract <addr>', 'deployment address of the RocketDepositArbitrage contract', '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
-       .option('-up, --uni-pool <address>', 'Uniswap pool to use when using RocketUniArb', '0xa4e0faa58465a2d369aa21b3e42d43374c6f9613')
-       .option('-k, --no-swap-reth', 'keep the minted rETH instead of selling it (only works with --no-flash-loan)')
-       .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --no-flash-loan)', 220000)
-       .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --no-flash-loan)', 80000)
-       .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction (only relevant for --no-flash-loan)', 400000)
+       .option('--yes', 'skip all confirmations')
+       .addOption(
+          new Option('-fm, --funding-method <method>', 'the method to use for funding the arbitrage.\n\
+  - with `flashLoan`, we take out an eth flash loan and then swap through whichever route gives the best arb.\n\
+  - with `uniswap`, we swap directly through a WETH <-> rETH uniswap v3 pool, using the pool\'s flash loan functionaity.\n\
+  - with `self` we use eth in the local wallet to fund the arbitrage'
+  )
+         .choices(['flashLoan', 'uniswap', 'self'])
+         .default("flashLoan")
+       )
+       
+       // options for --funding-method flashLoan'
+       .option('-b, --arb-contract <addr>', 'contract address to use when --funding-method = flashLoan', '0xE46BFe6F559041cc1323dB3503a09c49fb5d8828')
+
+       // options for --funding-method uniswap'
+       .option('-ub, --uni-arb-contract <addr>', 'contract address to use when --funding-method = uniswap', '0x6fCfE8c6e35fab88e0BecB3427e54c8c9847cdc2')
+       .option('-up, --uni-pool <address>', 'Uniswap pool to swap on when --funding-method = uniswap', '0xa4e0faa58465a2d369aa21b3e42d43374c6f9613')
+       
+       // options for --funding-method self'
+       .addOption(new Option('-y, --no-flash-loan', 'deprecated. use `--funding-method self` instead').implies({fundingMethod: 'self' }))
+       .option('-k, --no-swap-reth', 'keep the minted rETH instead of selling it (only works with --funding-method self)')
+       .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --funding-method self)', 220000)
+       .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --funding-method self)', 80000)
+       .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction (only relevant for --funding-method self)', 400000)
 program.parse()
 const options = program.opts()
 
@@ -43,8 +59,8 @@ const validatorDepositSize = oneEther.mul(32)
 console.log('Welcome to RocketArb: Deposit!')
 
 function checkOptions(resumeDeposit) {
-  if (!options.swapReth && options.flashLoan) {
-    console.log('Invalid options: --flash-loan implies --swap-reth')
+  if (!options.swapReth && options.fundingMethod != 'self') {
+    console.log('Invalid options: when --funding-method isn\'t \'self\' --swap-reth is required')
     process.exit()
   }
 
@@ -77,7 +93,6 @@ const ethAddress = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
 const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
 const swapRouterAddress = '0x1111111254fb6c44bAC0beD2854e76F90643097d'
-const rocketUniArbAddress = '0x6fCfE8c6e35fab88e0BecB3427e54c8c9847cdc2'
 
 const rocketContracts = []
 
@@ -311,13 +326,13 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   console.log('Creating arb transaction')
 
   const arbAbi = ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"]
-  const arbContract = new ethers.Contract(options.arbContract, arbAbi, provider)
+  
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
   const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
-  const useUniswap = options.arbContract === rocketUniArbAddress
+  const useUniswap = options.fundingMethod === 'uniswap'
   if (useUniswap) {
-    console.log('Using RocketUniArb for arbitrage via a Uniswap flash swap')
+    console.log(`Using RocketUniArb (${options.uniArbContract}) for arbitrage via a Uniswap flash swap (uniswap pool: ${options.uniPool})`)
   }
   else {
     console.log(`Using RocketDepositArbitrage contract ${options.arbContract}`)
@@ -329,6 +344,7 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   const minProfit = gasRefund.mul(signedDepositTx.maxFeePerGas)
   const feeData = getFeeData(signedDepositTx, resumedDeposit)
 
+  const arbContract = new ethers.Contract(useUniswap ? options.uniArbContract : options.arbContract, arbAbi, provider)
   const unsignedArbTx = await arbContract.populateTransaction.arb(ethAmount, minProfit, swapData)
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
@@ -345,7 +361,7 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
 
 async function makeBundle() {
   const encodedSignedDepositTx = getDepositTx()
-  if (options.flashLoan) {
+  if (options.fundingMethod !== 'self') {
     const encodedSignedArbTx = await getArbTx(encodedSignedDepositTx, false)
     const bundle = [
       {signedTransaction: encodedSignedDepositTx},
@@ -361,7 +377,7 @@ async function makeBundle() {
 async function retrieveDeposit() {
   console.log(`Resuming using deposit from ${options.bundleFile}`)
   const deposit = JSON.parse(await fs.readFile(options.bundleFile, 'utf-8'))[0]
-  if (options.flashLoan) {
+  if (options.fundingMethod !== 'self') {
     const arbTx = await getArbTx(deposit.signedTransaction, true)
     return [deposit, {signedTransaction: arbTx}]
   }
