@@ -162,14 +162,15 @@ Our overall recommendation is:
 By default `rocketarb` uses the smartnode daemon to sign all transactions. For
 security, you can instead use the `--daemon <program>` argument to avoid
 running `rocketarb` on your node. The `<program>` supplied will be called in
-two ways by `rocketarb`, with different arguments:
+three ways by `rocketarb`, with different arguments:
 
-1. `<program> api node deposit <amount> <commission> <salt> false`
+1. `<program> api node deposit <amount> <commission> <salt> <credits> false`
 
    The program should output a signed minipool deposit transaction (_without_
    any leading `0x`), just as the smartnode daemon api would output with these
    arguments. (You could run the smartnode daemon once first to get the data
-   then save it for further use by `rocketarb`.)
+   then save it for further use by `rocketarb`.) The <credits> argument is only
+   supplied if the version (see item 3 below) is at least 1.9.0.
 
 2. `<program> api node sign <inputSignedTx>`
 
@@ -179,3 +180,7 @@ two ways by `rocketarb`, with different arguments:
    to do the non-deposit transactions with. `<inputSignedTx>` is a signed
    transaction (_without_ the leading `0x`) signed by a random account.
    `signedTx` should be a string that _includes_ a leading `0x`.
+
+3. `<program> --version`
+
+   The program should output `rocketpool version <maj>.<min>.<patch>...`.

@@ -167,6 +167,18 @@ async function printPremium() {
 
 function getDepositTx() {
   var cmd = options.daemon
+  var addUseCreditArg = false
+  const version = execSync(cmd.concat(' --version')).toString().split(' ')
+  if (version.length === 3 && version[0] === 'rocketpool' && version[1] === 'version') {
+    console.log(`Got smartnode version ${version[2]}`)
+    if (version[2].startsWith('1.9'))
+      addUseCreditArg = true
+  }
+  else {
+    console.log(`Error: expected rocketpool version x.y.z, got ${version}`)
+    process.exit(1)
+  }
+
   if (options.maxFee) cmd = cmd.concat(' --maxFee ', options.maxFee)
   if (options.maxPrio) cmd = cmd.concat(' --maxPrioFee ', options.maxPrio)
   if (options.extraArgs) cmd = cmd.concat(' ', options.extraArgs)
@@ -177,6 +189,7 @@ function getDepositTx() {
     ' ', ethers.utils.formatUnits(amountWei, "wei"),
     ' ', options.minFee.toString(),
     ' ', salt.toString(),
+    addUseCreditArg ? ' true' : '',
     ' false')
 
   console.log(`Creating deposit transaction by executing smartnode: ${cmd}`)
