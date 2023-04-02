@@ -25,7 +25,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
        .option('-c, --min-fee <com>', 'minimum minipool commission fee', .15)
        .option('-s, --slippage <percentage>', 'slippage tolerance for the arb swap', 2)
-       .option('--yes', 'skip all confirmations')
+       .option('-y, --yes', 'skip all confirmations')
        .addOption(
           new Option('-fm, --funding-method <method>', 'the method to use for funding the arbitrage.\n\
   - with `flashLoan`, we take out an eth flash loan and then swap through whichever route gives the best arb.\n\
@@ -44,7 +44,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-up, --uni-pool <address>', 'Uniswap pool to swap on when --funding-method = uniswap', '0xa4e0faa58465a2d369aa21b3e42d43374c6f9613')
 
        // options for --funding-method self'
-       .addOption(new Option('-y, --no-flash-loan', 'deprecated. use `--funding-method self` instead').implies({fundingMethod: 'self' }))
+       .addOption(new Option('--no-flash-loan', 'deprecated. same as `--funding-method self`').implies({fundingMethod: 'self' }))
        .option('-k, --no-swap-reth', 'keep the minted rETH instead of selling it (only works with --funding-method self)')
        .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --funding-method self)', 220000)
        .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --funding-method self)', 80000)
