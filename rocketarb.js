@@ -19,7 +19,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-u, --gas-refund <gas>', 'set min-profit to a gas refund of this much gas', 2800000)
        .option('-g, --gas-limit <gas>', 'gas limit for arbitrage transaction', 990000)
        .option('-p, --no-use-dp', 'do not include space in the deposit pool in the arb')
-       .option('-d, --daemon <cmd>', 'command (+ args if req) to run the rocketpool smartnode daemon', 'docker exec rocketpool_node /go/bin/rocketpool')
+       .option('-d, --daemon <cmd>', 'command (+ args if req) to run the rocketpool smartnode daemon, or "interactive"', 'docker exec rocketpool_node /go/bin/rocketpool')
        .option('-x, --extra-args <args>', 'extra (space-separated) arguments to pass to daemon calls')
        .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
        .option('-a, --amount <amt>', 'amount in ether to deposit', 16)
@@ -49,6 +49,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --funding-method self)', 220000)
        .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --funding-method self)', 80000)
        .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction (only relevant for --funding-method self)', 400000)
+       .option('-gd, --deposit-gas-limit <gas>', 'gas limit for deposit transaction (only relevant when using --interactive)', 2500000)
 program.parse()
 const options = program.opts()
 
@@ -117,10 +118,13 @@ async function populateRocketContracts() {
   const rocketDepositPool = new ethers.Contract(
     rocketDepositPoolAddress, ["function getBalance() view returns (uint256)",
                                "function deposit() payable"], provider)
+  const rocketNodeDepositAddress = await rocketStorage.getAddress(
+      ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketNodeDeposit")))
   rocketContracts.push(rethAddress)
   rocketContracts.push(rethContract)
   rocketContracts.push(depositSettings)
   rocketContracts.push(rocketDepositPool)
+  rocketContracts.push(rocketNodeDepositAddress)
 }
 
 function oneInchAPI(method, query) {
@@ -165,6 +169,52 @@ async function printPremium() {
   console.log(`${percentage}% ${direction}`)
 }
 
+function makeAddKey(tx) {
+  function addKey(acc, key) { if (key in tx) acc[key] = tx[key]; return acc }
+  return addKey
+}
+const txFields = "accessList chainId data gasPrice gasLimit maxFeePerGas maxPriorityFeePerGas nonce to type value".split(" ")
+const sigFields = "v r s".split(" ")
+function runCmd(cmd) {
+  if (options.daemon !== 'interactive') {
+    return execSync(cmd)
+  }
+
+  const args = cmd.split(' ')
+  while (args.shift() !== 'api') {}
+  if (args.shift() !== 'node') throw new Error('catastrophic failure')
+
+  if (args[0] === 'sign') {
+    const origTx = ethers.utils.parseTransaction(`0x${args[1]}`)
+    const toSign = txFields.reduce(makeAddKey(origTx), { })
+    console.log(`After the > please provide missing (i.e. signature) fields for ${JSON.stringify(toSign)}`)
+    const moreFields = JSON.parse(prompt('> '))
+    moreFields.v = parseInt(moreFields.v)
+    const addKey = makeAddKey(moreFields)
+    const rawTx = ethers.utils.serializeTransaction(toSign, sigFields.reduce(addKey, { }))
+    return `{"status": "success", "signedData": "${rawTx}"}`
+  }
+
+  console.log(`After the > please paste the deposit calldata for ${cmd}`)
+  const calldata = prompt('> ')
+  const toSign = {
+    to: rocketContracts[4],
+    value: ethers.BigNumber.from(args[1]),
+    data: calldata,
+    gasLimit: ethers.BigNumber.from(options.depositGasLimit),
+    maxFeePerGas: ethers.utils.parseUnits(options.maxFee || '16', 'gwei'),
+    maxPriorityFeePerGas: ethers.utils.parseUnits(options.maxPrio || '2', 'gwei'),
+    type: 2,
+    chainId: 1
+  }
+  console.log(`After the > please provide missing (incl. signature) fields for ${JSON.stringify(toSign)}`)
+  const moreFields = JSON.parse(prompt('> '))
+  moreFields.v = parseInt(moreFields.v)
+  const addKey = makeAddKey({...toSign, ...moreFields})
+  const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
+  return rawTx.substring(2)
+}
+
 function getDepositTx() {
   var cmd = options.daemon
   var addUseCreditArg = false
@@ -194,7 +244,7 @@ function getDepositTx() {
 
   console.log(`Creating deposit transaction by executing smartnode: ${cmd}`)
 
-  const cmdOutput = execSync(cmd)
+  const cmdOutput = runCmd(cmd)
   const encodedSignedDepositTx = `0x${cmdOutput.toString().trim()}`
   // console.log(`Got tx: ${encodedSignedDepositTx}`)
   console.log(`Got deposit transaction data from smartnode`)
@@ -259,7 +309,8 @@ async function signTx(tx) {
   // sign randomly first to get around go-ethereum unmarshalling issue
   const fakeSigned = await randomSigner.signTransaction(tx)
   cmd = options.daemon.concat(' api node sign ', fakeSigned.substring(2))
-  const cmdOutput = execSync(cmd)
+  await populateRocketContracts()
+  const cmdOutput = runCmd(cmd)
   const signOutput = JSON.parse(cmdOutput)
   console.assert(signOutput.status === 'success', `Signing transaction failed: ${signOutput.error}`)
   return signOutput.signedData
@@ -372,6 +423,7 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
 }
 
 async function makeBundle() {
+  await populateRocketContracts()
   const encodedSignedDepositTx = getDepositTx()
   if (options.fundingMethod !== 'self') {
     const encodedSignedArbTx = await getArbTx(encodedSignedDepositTx, false)
