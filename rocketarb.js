@@ -189,6 +189,7 @@ function runCmd(cmd) {
     const toSign = txFields.reduce(makeAddKey(origTx), { })
     console.log(`After the > please provide missing (i.e. signature) fields for ${JSON.stringify(toSign)}`)
     const moreFields = JSON.parse(prompt('> '))
+    moreFields.v = parseInt(moreFields.v)
     const addKey = makeAddKey(moreFields)
     const rawTx = ethers.utils.serializeTransaction(toSign, sigFields.reduce(addKey, { }))
     return `{"status": "success", "signedData": "${rawTx}"}`
@@ -208,6 +209,7 @@ function runCmd(cmd) {
   }
   console.log(`After the > please provide missing (incl. signature) fields for ${JSON.stringify(toSign)}`)
   const moreFields = JSON.parse(prompt('> '))
+  moreFields.v = parseInt(moreFields.v)
   const addKey = makeAddKey({...toSign, ...moreFields})
   const rawTx = ethers.utils.serializeTransaction(txFields.reduce(addKey, { }), sigFields.reduce(addKey, { }))
   return rawTx.substring(2)
