@@ -8,7 +8,7 @@ Outside of short-term fluctuations the price of rETH will tend to trade at a pre
 
 ## Setting the stage
 
-A core part of Rocket Pool’s staking design that is relevant to this arbitrage is the deposit queue, where ETH can chill out and await the creation of a new minipool at which point the ETH will be staked and start earning a return. The deposit pool needs to be capped at some nominal size (currently 5000 ETH) because while queued ETH immediately mints new rETH, it is not yet generating yield and hence slightly dilutes the APR of all participants. Because of the high demand for rETH the queue tends to be full more often than not, and when this is the case it means that no more ETH can be deposited until space opens up.
+A core part of Rocket Pool’s staking design that is relevant to this arbitrage is the deposit queue, where ETH can chill out and await the creation of a new minipool at which point the ETH will be staked and start earning a return. The deposit pool needs to be capped at some nominal size (currently 18000 ETH) because while queued ETH immediately mints new rETH, it is not yet generating yield and hence slightly dilutes the APR of all participants. Because of the high demand for rETH the queue tends to be full more often than not, and when this is the case it means that no more ETH can be deposited until space opens up.
 
 ## Highly profitable arbitrage strategy
 
