@@ -19,6 +19,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-u, --gas-refund <gas>', 'set min-profit to a gas refund of this much gas', 2800000)
        .option('-g, --gas-limit <gas>', 'gas limit for arbitrage transaction', 990000)
        .option('-p, --no-use-dp', 'do not include space in the deposit pool in the arb')
+       .option('--max-mint <amt>', 'maximum amount of ETH to spend on minting rETH', 100)
        .option('-d, --daemon <cmd>', 'command (+ args if req) to run the rocketpool smartnode daemon, or "interactive"', 'docker exec rocketpool_node /go/bin/rocketpool')
        .option('-x, --extra-args <args>', 'extra (space-separated) arguments to pass to daemon calls')
        .option('-v, --bundle-file <file>', 'filename for saving the bundle before submission or reading a saved bundle', 'bundle.json')
@@ -258,7 +259,9 @@ async function getAmounts(minipoolDepositAmount) {
   const dpFee = await depositSettings.getDepositFee()
   const dpSize = await depositSettings.getMaximumDepositPoolSize()
   const dpSpace = dpSize.sub(await rocketDepositPool.getBalance())
-  const ethAmount = options.useDp ? amount.add(dpSpace) : amount
+  const maxMintWei = ethers.utils.parseUnits(options.maxMint.toString(), 'ether')
+  const tryEthAmount = options.useDp ? amount.add(dpSpace) : amount
+  const ethAmount = tryEthAmount.lt(maxMintWei) ? tryEthAmount : maxMintWei
   const depositFee = ethAmount.mul(dpFee).div(oneEther)
   const depositAmount = ethAmount.sub(depositFee)
   const rethAmount = await rethContract.getRethValue(depositAmount)
