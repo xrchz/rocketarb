@@ -222,7 +222,8 @@ function getDepositTx() {
   const version = execSync(cmd.concat(' --version')).toString().split(' ')
   if (version.length === 3 && version[0] === 'rocketpool' && version[1] === 'version') {
     console.log(`Got smartnode version ${version[2]}`)
-    if (version[2].startsWith('1.9'))
+    const [majorVersion, minorVersion] = version[2].split('.')
+    if (parseInt(majorVersion) > 1 || (majorVersion == '1' && parseInt(minorVersion) >= 9))
       addUseCreditArg = true
   }
   else {
