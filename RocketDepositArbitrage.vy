@@ -1,4 +1,4 @@
-# @version ^0.3.7
+# @version ^0.3.9
 
 MAX_DATA: constant(uint256) = 2**13
 
@@ -28,24 +28,32 @@ interface RocketDepositArbitrageInterface:
 rocketStorage: immutable(RocketStorageInterface)
 rethToken: immutable(RethInterface)
 wethToken: immutable(WethInterface)
-flashLender: immutable(FlashLoanInterface)
-swapRouter: immutable(address)
+flashLender: public(FlashLoanInterface)
+swapRouter: public(address)
 owner: public(address)
 
 @external
-def __init__(flashLenderAddress: address, rocketStorageAddress: address, swapRouterAddress: address, wethAddress: address):
+def __init__(rocketStorageAddress: address, wethAddress: address):
   self.owner = msg.sender
   rocketStorage = RocketStorageInterface(rocketStorageAddress)
   rethAddress: address = rocketStorage.getAddress(keccak256("contract.addressrocketTokenRETH"))
   rethToken = RethInterface(rethAddress)
   wethToken = WethInterface(wethAddress)
-  flashLender = FlashLoanInterface(flashLenderAddress)
-  swapRouter = swapRouterAddress
 
 @external
 def setOwner(newOwner: address):
   assert msg.sender == self.owner, "only owner can set owner"
   self.owner = newOwner
+
+@external
+def setFlashLender(newFlashLender: address):
+  assert msg.sender == self.owner, "auth"
+  self.flashLender = FlashLoanInterface(newFlashLender)
+
+@external
+def setSwapRouter(newSwapRouter: address):
+  assert msg.sender == self.owner, "auth"
+  self.swapRouter = newSwapRouter
 
 @external
 @payable
@@ -65,8 +73,8 @@ def onFlashLoan(initiator: address, token: address, amount: uint256, fee: uint25
   assert rethToken.balanceOf(self) == 0, "unexpected held rETH"
   rocketDepositPool.deposit(value = amount)
 
-  assert rethToken.approve(swapRouter, rethToken.balanceOf(self)), "rETH approve failed"
-  raw_call(swapRouter, data)
+  assert rethToken.approve(self.swapRouter, rethToken.balanceOf(self)), "rETH approve failed"
+  raw_call(self.swapRouter, data)
   assert wethToken.balanceOf(self) >= amount, "not enough WETH after swap"
   assert rethToken.balanceOf(self) == 0, "rETH left over after swap"
 
@@ -76,7 +84,7 @@ def onFlashLoan(initiator: address, token: address, amount: uint256, fee: uint25
 @external
 def arb(wethAmount: uint256, minProfit: uint256, swapData: Bytes[MAX_DATA]):
   RocketDepositArbitrageInterface(self).drain()
-  assert flashLender.flashLoan(self, wethToken.address, wethAmount, swapData), "flash loan failed"
+  assert self.flashLender.flashLoan(self, wethToken.address, wethAmount, swapData), "flash loan failed"
   profit: uint256 = wethToken.balanceOf(self)
   assert profit >= minProfit, "not enough profit"
   wethToken.withdraw(profit)
