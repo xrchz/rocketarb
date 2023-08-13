@@ -9,7 +9,7 @@ interface RocketDepositPoolInterface:
   def deposit(): payable
 
 interface FlashLoanInterface:
-  def flashLoan(receiver: address, token: address[1], amount: uint256[1], data: Bytes[MAX_DATA]): nonpayable
+  def flashLoan(receiver: address, token: DynArray[address, 1], amount: DynArray[uint256, 1], data: Bytes[MAX_DATA]): nonpayable
 
 interface WethInterface:
   def approve(_spender: address, _amount: uint256) -> bool: nonpayable
