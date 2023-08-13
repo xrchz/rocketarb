@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+require('dotenv').config()
 const { execSync } = require('child_process')
 const { program, Option } = require('commander')
 const https = require('https')
@@ -38,7 +39,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        )
 
        // options for --funding-method flashLoan'
-       .option('-b, --arb-contract <addr>', 'contract address to use when --funding-method = flashLoan', '0xE46BFe6F559041cc1323dB3503a09c49fb5d8828')
+       .option('-b, --arb-contract <addr>', 'contract address to use when --funding-method = flashLoan', '0xEADc96a160E3a51e7318c0954B28c4a367d5f909')
 
        // options for --funding-method uniswap'
        .option('-ub, --uni-arb-contract <addr>', 'contract address to use when --funding-method = uniswap', '0x6fCfE8c6e35fab88e0BecB3427e54c8c9847cdc2')
@@ -94,7 +95,7 @@ const provider = new ethers.providers.JsonRpcProvider(options.rpc)
 const ethAddress = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
 const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
-const swapRouterAddress = '0x1111111254fb6c44bAC0beD2854e76F90643097d'
+const swapRouterAddress = '0x1111111254EEB25477B68fb85Ed929f73A960582'
 
 const rocketContracts = []
 
@@ -130,9 +131,9 @@ async function populateRocketContracts() {
 
 function oneInchAPI(method, query) {
   const queryString = new URLSearchParams(query).toString()
-  const url = `https://api.1inch.io/v4.0/1/${method}?${queryString}`
+  const url = `https://api.1inch.dev/swap/v5.2/1/${method}?${queryString}`
   return new Promise((resolve, reject) => {
-    const req = https.get(url,
+    const req = https.get(url, {headers: {'Authorization': `Bearer ${process.env.API_KEY}`}},
       (res) => {
         if (res.statusCode !== 200) {
           console.log(`Got ${res.statusCode} from 1inch: ${res.statusMessage}`)
@@ -153,12 +154,12 @@ async function printPremium() {
   const primaryRate = await rethContract.getExchangeRate()
 
   const quoteParams = {
-    fromTokenAddress: rethAddress,
-    toTokenAddress: wethAddress,
+    src: rethAddress,
+    dst: wethAddress,
     amount: oneEther.toString(),
   }
   const quote = await oneInchAPI('quote', quoteParams)
-  const secondaryRate = ethers.BigNumber.from(quote.toTokenAmount)
+  const secondaryRate = ethers.BigNumber.from(quote.toAmount)
 
   const percentage = ethers.utils.formatUnits(
     ((primaryRate.sub(secondaryRate).abs()).mul('100')).mul('1000').div(primaryRate),
@@ -273,9 +274,9 @@ async function getAmounts(minipoolDepositAmount) {
 
 async function getSwapData(rethAmount, rethAddress, fromAddress) {
   const swapParams = {
-    fromTokenAddress: rethAddress,
-    toTokenAddress: fromAddress ? ethAddress : wethAddress,
-    fromAddress: fromAddress || options.arbContract,
+    src: rethAddress,
+    dst: fromAddress ? ethAddress : wethAddress,
+    from: fromAddress || options.arbContract,
     amount: rethAmount,
     slippage: options.slippage,
     allowPartialFill: false,

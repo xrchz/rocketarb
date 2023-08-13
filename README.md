@@ -30,6 +30,10 @@ The Rocket Pool protocol continues to evolve over time. In the future when ETH w
 How to? Here are the steps... Message me (ramana#2626) on the RocketPool Discord if you have
 any problems!
 
+## Optional Prerequisite: Using the 1Inch API
+If you want to use the default funding method (Balancer flash loan) and/or to use the `--premium` option to print the current rETH premium, you need an API key for 1Inch.
+Get one from https://portal.1inch.dev and put it in a file called `.env` as a single line in this format: `API_KEY=put_the_api_key_here`.
+
 ## Docker mode
 
 If you have Docker installed, you can run `rocketarb` with no
