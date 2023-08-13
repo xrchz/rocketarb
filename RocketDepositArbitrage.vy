@@ -58,7 +58,7 @@ def __default__():
   assert msg.sender == wethToken.address, "only WETH can send ETH"
 
 @external
-def receiveFlashLoan(token: address[1], amount: DynArray[uint256, 1], fee: DynArray[uint256, 1], data: Bytes[MAX_DATA]):
+def receiveFlashLoan(token: DynArray[address, 1], amount: DynArray[uint256, 1], fee: DynArray[uint256, 1], data: Bytes[MAX_DATA]):
   assert msg.sender == flashLender.address, "only Balancer vault can lend"
   assert token[0] == wethToken.address, "only WETH can be flash loaned"
   assert fee[0] == 0, "no fee allowed"
