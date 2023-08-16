@@ -12,9 +12,9 @@ interface FlashLoanInterface:
   def flashLoan(receiver: address, token: DynArray[address, 1], amount: DynArray[uint256, 1], data: Bytes[MAX_DATA]): nonpayable
 
 interface WethInterface:
-  def approve(_spender: address, _amount: uint256) -> bool: nonpayable
   def balanceOf(_who: address) -> uint256: view
   def deposit(): payable
+  def transfer(_to: address, _wad: uint256) -> bool: nonpayable
   def withdraw(_wad: uint256): nonpayable
 
 interface RethInterface:
@@ -75,7 +75,7 @@ def receiveFlashLoan(token: DynArray[address, 1], amount: DynArray[uint256, 1], 
   assert wethToken.balanceOf(self) >= amount[0], "not enough WETH after swap"
   assert rethToken.balanceOf(self) == 0, "rETH left over after swap"
 
-  assert wethToken.approve(msg.sender, amount[0]), "WETH approve failed"
+  assert wethToken.transfer(msg.sender, amount[0]), "WETH transfer failed"
 
 @external
 def arb(wethAmount: uint256, minProfit: uint256, swapData: Bytes[MAX_DATA]):
