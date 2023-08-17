@@ -1,0 +1,84 @@
+#define constant rETH = 0xae78736Cd615f374D3085123A210448E74Fc6393
+#define constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+#define constant rock = 0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46
+#define constant dkey = 0x65dd923ddfc8d8ae6088f80077201d2403cbd565f0ba25e09841e2799ec90bb2 // keccak256('contract.addressrocketDepositPool')
+#define constant lady = FREE_STORAGE_POINTER()
+#define constant swap = FREE_STORAGE_POINTER()
+
+#define macro CONSTRUCTOR() = { caller [lady] sstore }
+
+#define macro DIE(x) = { <x> push0 mstore8 0x1 push0 revert }
+
+// error code: 0x0 (unauthorised)
+#define macro SET(name) = {
+caller [lady] eq set jumpi 0x1 push0 revert set:
+0x4 calldataload <name> sstore stop }
+
+// drain to the lady
+// error codes: 0x1 (balanceOf), 0x2 (rETH transfer), 0x3 (WETH withdraw), 0x4 (send)
+#define macro OUT() = {
+__FUNC_SIG("balanceOf(address)") push0 mstore address 0x20 mstore
+0x20 0x40 0x24 0x1c [rETH] gas staticcall
+0x20 0x60 0x24 0x1c [WETH] gas staticcall
+and out jumpi DIE(0x1) out:
+0x40 mload iszero skiprETH jumpi
+__FUNC_SIG("transfer(address,uint256)") push0 mstore [lady] 0x20 mstore
+0x20 push0 0x44 0x1c push0 [rETH] gas call
+push0 mload and skiprETH jumpi DIE(0x2) skiprETH:
+0x60 mload iszero skipWETH jumpi
+__FUNC_SIG("withdraw(uint256)") 0x40 mstore
+push0 push0 0x24 0x5c push0 [WETH] gas call
+skipWETH jumpi DIE(0x3) skipWETH:
+push0 push0 push0 push0 selfbalance [lady] gas call
+end jumpi DIE(0x4) end: stop }
+
+// actually do an arb(rETH_amount, ETH_amount, min_profit, data)
+// error codes: 0x5 (approve), 0x6 (swap), 0x7 (check swap), 0x8 (check+withdraw WETH),
+// 0x9 (deposit/mint), 0xa (not enough rETH minted), 0xb (not enough profit), 0xc (send)
+#define macro ARB() = {
+__FUNC_SIG("balanceOf(address)") push0 mstore address 0x20 mstore
+0x20 0x40 0x24 0x1c [rETH] gas staticcall
+approve jumpi DIE(0x1) approve:
+// approve the current swap router to spend the rETH amount argument of rETH
+__FUNC_SIG("approve(address,uint256)") 0x40 mstore [swap] 0x60 mstore
+0x4 calldataload 0x80 mstore
+0x20 0x40 0x44 0x5c push0 [rETH] gas call
+push0 mload and arb jumpi DIE(0x5) arb:
+// call the current swap router with the data argument
+push0 push0 0x64 calldatasize sub dup1 // data.length data.length 0 0 rETH.balance
+0x64 0x40 calldatacopy 0x40            // 0x40 data.length 0 0 rETH.balance
+push0 [swap] gas call
+mint jumpi DIE(0x6) mint:
+// withdraw any WETH balance
+0x20 0x60 0x24 0x1c [WETH] gas staticcall
+withdraw jumpi DIE(0x1) withdraw:
+0x60 mload iszero skipWithdraw jumpi
+__FUNC_SIG("withdraw(uint256)") 0x40 mstore
+push0 push0 0x24 0x5c push0 [WETH] gas call
+skipWithdraw jumpi DIE(0x3) skipWithdraw:
+// deposit the ETH amount argument of ETH to mint rETH
+__FUNC_SIG("getAddress(bytes32)") 0x40 mstore [dkey] 0x60 mstore
+0x20 0x40 0x24 0x5c [rock] staticcall
+deposit jumpi DIE(0x9) deposit:
+__FUNC_SIG("deposit()") 0x60 mstore
+push0 push0 0x4 0x7c 0x24 calldataload 0x40 mload gas call
+check jumpi DIE(0x9) check:
+// check that the amount of rETH is now at least the original amount
+0x20 0x40 0x24 0x1c [rETH] gas staticcall
+amount jumpi DIE(0x1) amount:
+0x40 mload lt iszero profit jumpi DIE(0xa) profit:
+// check that the ETH contract balance is at least the min profit argument
+selfbalance 0x44 calldataload lt iszero send jumpi DIE(0xb) send:
+// send the ETH balance to the caller
+push0 push0 push0 push0 selfbalance caller gas call
+fin jumpi DIE(0xc) fin: stop }
+
+#define macro MAIN() = {
+push0 calldataload 0xe0 shr
+__FUNC_SIG("arb(uint256,uint256,uint256,bytes)") eq arb jumpi
+__FUNC_SIG("set(address)") eq set jumpi
+__FUNC_SIG("own(address)") eq own jumpi
+OUT()
+arb: ARB()
+own: SET(lady)
+set: SET(swap) }
