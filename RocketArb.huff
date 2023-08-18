@@ -21,8 +21,9 @@ __FUNC_SIG("balanceOf(address)") push0 mstore address 0x20 mstore
 0x20 0x40 0x24 0x1c [rETH] gas staticcall
 0x20 0x60 0x24 0x1c [WETH] gas staticcall
 and out jumpi DIE(0x1) out:
+[lady] sload 0x20 mstore
 0x40 mload iszero skiprETH jumpi
-__FUNC_SIG("transfer(address,uint256)") push0 mstore [lady] sload 0x20 mstore
+__FUNC_SIG("transfer(address,uint256)") push0 mstore
 0x20 push0 0x44 0x1c push0 [rETH] gas call
 push0 mload and skiprETH jumpi DIE(0x2) skiprETH:
 0x60 mload iszero skipWETH jumpi
