@@ -25,10 +25,11 @@ RUN set -eu \
     # rocketarb
     && npm install \
     && chmod 0755 /app/*.js \
+    && chmod 0755 /app/*.mjs \
     # Cleanup
     && apt-get remove --purge --auto-remove -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /work
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/app/rocketarb.js"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/rocketarb.mjs"]

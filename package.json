@@ -3,12 +3,13 @@
   "version": "0.0.1",
   "license": "GPL-3.0-or-later",
   "description": "Arbitrage rETH mint/burn with minipool deposit/withdraw",
-  "bin": "./rocketarb.js",
+  "bin": "./rocketarb.mjs",
+  "type": "module",
   "dependencies": {
-    "commander": ">=9.4.0",
-    "prompt-sync": ">=4.2.0",
-    "dotenv": ">=16.0.3",
+    "commander": "9",
+    "prompt-sync": "4",
+    "dotenv": "16",
     "ethers": ">=5.6.9",
-    "@flashbots/ethers-provider-bundle": ">=0.5.0"
+    "@flashbots/ethers-provider-bundle": "0"
   }
 }
