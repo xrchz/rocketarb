@@ -9,7 +9,7 @@
     "commander": "9",
     "prompt-sync": "4",
     "dotenv": "16",
-    "ethers": ">=5.6.9",
+    "ethers": "5",
     "@flashbots/ethers-provider-bundle": "0"
   }
 }
