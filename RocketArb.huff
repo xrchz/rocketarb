@@ -75,10 +75,7 @@ fin jumpi DIE(0xc) fin: stop }
 
 #define macro MAIN() = {
 push0 calldataload 0xe0 shr
-__FUNC_SIG("arb(uint256,uint256,uint256,bytes)") eq arb jumpi
-__FUNC_SIG("set(address)") eq set jumpi
+dup1 __FUNC_SIG("arb(uint256,uint256,uint256,bytes)") eq arb jumpi
+dup1 __FUNC_SIG("set(address)") eq set jumpi
 __FUNC_SIG("own(address)") eq own jumpi
-OUT()
-arb: ARB()
-own: SET(lady)
-set: SET(swap) }
+OUT() arb: ARB() own: SET(lady) set: SET(swap) }
