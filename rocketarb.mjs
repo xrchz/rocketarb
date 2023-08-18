@@ -31,16 +31,17 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-y, --yes', 'skip all confirmations')
        .addOption(
           new Option('-fm, --funding-method <method>', 'the method to use for funding the arbitrage.\n\
-  - with `flashLoan`, we take out an eth flash loan and then swap through whichever route gives the best arb.\n\
+  - with `huffLoan`, we use the new Huff contract with rETH liquidity for a flash loan, and swap through whichever 1inch route gives the best arb.\n\
+  - with `flashLoan`, we take out an eth flash loan from Balancer and then swap through whichever 1inch route gives the best arb -- can fail if this is balancer.\n\
   - with `uniswap`, we swap directly through a WETH <-> rETH uniswap v3 pool, using the pool\'s flash loan functionaity.\n\
   - with `self` we use eth in the local wallet to fund the arbitrage'
   )
-         .choices(['flashLoan', 'uniswap', 'self'])
-         .default("flashLoan")
+         .choices(['huffLoan', 'flashLoan', 'uniswap', 'self'])
+         .default("uniswap")
        )
 
-       // options for --funding-method flashLoan'
-       .option('-b, --arb-contract <addr>', 'contract address to use when --funding-method = flashLoan', '0xEADc96a160E3a51e7318c0954B28c4a367d5f909')
+       // options for --funding-method flashLoan/huffLoan'
+       .option('-b, --arb-contract <addr>', 'contract address to use when --funding-method = flashLoan or huffLoan', '0xEADc96a160E3a51e7318c0954B28c4a367d5f909')
 
        // options for --funding-method uniswap'
        .option('-ub, --uni-arb-contract <addr>', 'contract address to use when --funding-method = uniswap', '0x6fCfE8c6e35fab88e0BecB3427e54c8c9847cdc2')
@@ -400,7 +401,9 @@ async function getArbBundleNoFlash(encodedSignedDepositTx, resumedDeposit) {
 async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   console.log('Creating arb transaction')
 
-  const arbAbi = ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"]
+  const arbAbi = options.fundingMethod == 'huffLoan' ?
+    ['function arb(uint256 rETHamount, uint256 ETHamount, uint256 minProfit, bytes swapData) nonpayable'] :
+    ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"]
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
   const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
@@ -421,7 +424,9 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   console.log(`signedDepositTx.nonce = ${signedDepositTx.nonce}`)
 
   const arbContract = new ethers.Contract(useUniswap ? options.uniArbContract : options.arbContract, arbAbi, provider)
-  const unsignedArbTx = await arbContract.populateTransaction.arb(ethAmount, minProfit, swapData)
+  const unsignedArbTx = options.fundingMethod == 'huffLoan' ?
+    await arbContract.populateTransaction.arb(rethAmount, ethAmount, minProfit, swapData) :
+    await arbContract.populateTransaction.arb(ethAmount, minProfit, swapData)
   unsignedArbTx.type = 2
   unsignedArbTx.chainId = signedDepositTx.chainId
   unsignedArbTx.nonce = signedDepositTx.nonce + 1
