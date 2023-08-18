@@ -11,7 +11,7 @@
 
 // error code: 0x0 (unauthorised)
 #define macro SET(name) = {
-caller [lady] eq auth jumpi 0x1 push0 revert auth:
+caller [lady] sload eq auth jumpi 0x1 push0 revert auth:
 0x4 calldataload <name> sstore stop }
 
 // drain to the lady
@@ -22,14 +22,14 @@ __FUNC_SIG("balanceOf(address)") push0 mstore address 0x20 mstore
 0x20 0x60 0x24 0x1c [WETH] gas staticcall
 and out jumpi DIE(0x1) out:
 0x40 mload iszero skiprETH jumpi
-__FUNC_SIG("transfer(address,uint256)") push0 mstore [lady] 0x20 mstore
+__FUNC_SIG("transfer(address,uint256)") push0 mstore [lady] sload 0x20 mstore
 0x20 push0 0x44 0x1c push0 [rETH] gas call
 push0 mload and skiprETH jumpi DIE(0x2) skiprETH:
 0x60 mload iszero skipWETH jumpi
 __FUNC_SIG("withdraw(uint256)") 0x40 mstore
 push0 push0 0x24 0x5c push0 [WETH] gas call
 skipWETH jumpi DIE(0x3) skipWETH:
-push0 push0 push0 push0 selfbalance [lady] gas call
+push0 push0 push0 push0 selfbalance 0x20 mload gas call
 end jumpi DIE(0x4) end: stop }
 
 // actually do an arb(rETH_amount, ETH_amount, min_profit, data)
@@ -40,14 +40,14 @@ __FUNC_SIG("balanceOf(address)") push0 mstore address 0x20 mstore
 0x20 0x40 0x24 0x1c [rETH] gas staticcall
 approve jumpi DIE(0x1) approve:
 // approve the current swap router to spend the rETH amount argument of rETH
-__FUNC_SIG("approve(address,uint256)") 0x40 mstore [swap] 0x60 mstore
+__FUNC_SIG("approve(address,uint256)") 0x40 mstore [swap] sload 0x60 mstore
 0x4 calldataload 0x80 mstore
 0x20 0x40 0x44 0x5c push0 [rETH] gas call
 push0 mload and sell jumpi DIE(0x5) sell:
 // call the current swap router with the data argument
 push0 push0 0x64 calldatasize sub dup1 // data.length data.length 0 0 rETH.balance
-0x64 0x40 calldatacopy 0x40            // 0x40 data.length 0 0 rETH.balance
-push0 [swap] gas call
+0x64 0x80 calldatacopy 0x80            // 0x80 data.length 0 0 rETH.balance
+push0 0x60 mload gas call
 mint jumpi DIE(0x6) mint:
 // withdraw any WETH balance
 0x20 0x60 0x24 0x1c [WETH] gas staticcall
