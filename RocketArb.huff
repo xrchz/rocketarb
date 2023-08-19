@@ -5,7 +5,10 @@
 #define constant lady = FREE_STORAGE_POINTER()
 #define constant swap = FREE_STORAGE_POINTER()
 
-#define macro CONSTRUCTOR() = { caller [lady] sstore }
+#define macro CONSTRUCTOR() = {
+  0xB0De8cB8Dcc8c5382c4b7F3E978b491140B2bC55 [lady] sstore
+  0x1111111254EEB25477B68fb85Ed929f73A960582 [swap] sstore
+}
 
 #define macro DIE(x) = { <x> push0 mstore8 0x1 push0 revert }
 
