@@ -69,10 +69,10 @@ check jumpi DIE(0x9) check:
 amount jumpi DIE(0x1) amount:
 0x40 mload lt iszero profit jumpi DIE(0xa) profit:
 // check that the ETH contract balance is at least the min profit argument
-selfbalance 0x44 calldataload lt iszero send jumpi DIE(0xb) send:
+push0 push0 push0 push0 selfbalance dup1
+0x44 calldataload lt fail jumpi
 // send the ETH balance to the caller
-push0 push0 push0 push0 selfbalance caller gas call
-fin jumpi DIE(0xc) fin: stop }
+caller gas call fin jumpi DIE(0xc) fin: stop fail: DIE(0xb) }
 
 #define macro MAIN() = {
 push0 calldataload 0xe0 shr
