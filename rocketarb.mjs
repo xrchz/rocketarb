@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
 import 'dotenv/config'
-import { execSync } from 'node:child_process'
+import child_process from 'node:child_process'
 import { program, Option } from 'commander'
 import https from 'node:https'
 import { ethers } from 'ethers'
 import flashbots from '@flashbots/ethers-provider-bundle'
 import promptSync from 'prompt-sync'
 import fs from 'node:fs/promises'
-promptSync()
+const prompt = promptSync()
+const { execSync } = child_process
 
 program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-t, --premium', 'print the rETH/ETH primary and secondary rates and exit')
