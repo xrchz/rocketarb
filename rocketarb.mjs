@@ -222,8 +222,8 @@ function runCmd(cmd) {
 }
 
 function getDepositTx() {
-  var cmd = options.daemon
-  var addUseCreditArg = false
+  let cmd = options.daemon
+  let addUseCreditArg = false
   const version = execSync(cmd.concat(' --version')).toString().split(' ')
   if (version.length === 3 && version[0] === 'rocketpool' && version[1] === 'version') {
     console.log(`Got smartnode version ${version[2]}`)
@@ -321,7 +321,7 @@ function getExpectedMinipoolAddress(depositTx) {
 async function signTx(tx) {
   // sign randomly first to get around go-ethereum unmarshalling issue
   const fakeSigned = await randomSigner.signTransaction(tx)
-  cmd = options.daemon.concat(' api node sign ', fakeSigned.substring(2))
+  let cmd = options.daemon.concat(' api node sign ', fakeSigned.substring(2))
   await populateRocketContracts()
   const cmdOutput = runCmd(cmd)
   const signOutput = JSON.parse(cmdOutput)
