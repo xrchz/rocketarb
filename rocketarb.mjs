@@ -53,7 +53,7 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-k, --no-swap-reth', 'keep the minted rETH instead of selling it (only works with --funding-method self)')
        .option('-gm, --mint-gas-limit <gas>', 'gas limit for mint transaction (only relevant for --funding-method self)', 220000)
        .option('-ga, --approve-gas-limit <gas>', 'gas limit for approve transaction (only relevant for --funding-method self)', 80000)
-       .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction (only relevant for --funding-method self)', 400000)
+       .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction', 400000)
        .option('-gd, --deposit-gas-limit <gas>', 'gas limit for deposit transaction (only relevant when using -d interactive)', 2500000)
 program.parse()
 const options = program.opts()
@@ -161,6 +161,7 @@ async function printPremium() {
     src: rethAddress,
     dst: wethAddress,
     amount: oneEther.toString(),
+    gasLimit: options.swapGasLimit
   }
   const quote = await oneInchAPI('quote', quoteParams)
   const secondaryRate = ethers.BigNumber.from(quote.toAmount)
@@ -285,10 +286,10 @@ async function getSwapData(rethAmount, rethAddress, fromAddress) {
     from: fromAddress || options.arbContract,
     amount: rethAmount,
     slippage: options.slippage,
+    gasLimit: options.swapGasLimit,
     allowPartialFill: false,
     disableEstimate: true
   }
-  if (fromAddress) swapParams.gasLimit = options.swapGasLimit
   const swap = await oneInchAPI('swap', swapParams)
   if (ethers.utils.getAddress(swap.tx.to) !== swapRouterAddress)
     console.log(`Warning: unexpected to address for swap: ${swap.tx.to}`)
