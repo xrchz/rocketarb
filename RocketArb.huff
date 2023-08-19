@@ -44,10 +44,10 @@ approve jumpi DIE(0x1) approve:
 __FUNC_SIG("approve(address,uint256)") 0x40 mstore [swap] sload 0x60 mstore
 0x4 calldataload 0x80 mstore
 0x20 0x40 0x44 0x5c push0 [rETH] gas call
-push0 mload and sell jumpi DIE(0x5) sell:
+0x40 mload and sell jumpi DIE(0x5) sell:
 // call the current swap router with the data argument
-push0 push0 0x64 calldatasize sub dup1 // data.length data.length 0 0 rETH.balance
-0x64 0x80 calldatacopy 0x80            // 0x80 data.length 0 0 rETH.balance
+push0 push0 0x84 calldataload dup1 // data.length data.length 0 0
+0xa4 0x80 calldatacopy 0x80        // 0x80 data.length 0 0
 push0 0x60 mload gas call
 mint jumpi DIE(0x6) mint:
 // withdraw any WETH balance
