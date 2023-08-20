@@ -42,7 +42,8 @@ program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        )
 
        // options for --funding-method flashLoan/huffLoan'
-       .option('-b, --arb-contract <addr>', 'contract address to use when --funding-method = flashLoan or huffLoan', '0xEADc96a160E3a51e7318c0954B28c4a367d5f909')
+       .option('-b, --arb-contract <addr>', 'contract address to use when --funding-method = flashLoan', '0xEADc96a160E3a51e7318c0954B28c4a367d5f909')
+       .option('-hb, --huff-arb-contract <addr>', 'contract address to use when --funding-method = huffLoan', '0x786d8351f419F2Cb076664abcB5F8Ca04e9F1D7D')
 
        // options for --funding-method uniswap'
        .option('-ub, --uni-arb-contract <addr>', 'contract address to use when --funding-method = uniswap', '0x6fCfE8c6e35fab88e0BecB3427e54c8c9847cdc2')
@@ -283,7 +284,7 @@ async function getSwapData(rethAmount, rethAddress, fromAddress) {
   const swapParams = {
     src: rethAddress,
     dst: fromAddress ? ethAddress : wethAddress,
-    from: fromAddress || options.arbContract,
+    from: fromAddress || (options.fundingMethod === 'huffLoan' ? options.huffArbContract : options.arbContract),
     amount: rethAmount,
     slippage: options.slippage,
     gasLimit: options.swapGasLimit,
@@ -403,15 +404,19 @@ async function getArbBundleNoFlash(encodedSignedDepositTx, resumedDeposit) {
 async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
   console.log('Creating arb transaction')
 
-  const arbAbi = options.fundingMethod == 'huffLoan' ?
+  const useUniswap = options.fundingMethod === 'uniswap'
+  const useHuffLoan = options.fundingMethod === 'huffLoan'
+  const arbAbi = useHuffLoan ?
     ['function arb(uint256 rETHamount, uint256 ETHamount, uint256 minProfit, bytes swapData) nonpayable'] :
     ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"]
 
   const signedDepositTx = ethers.utils.parseTransaction(encodedSignedDepositTx)
   const [ethAmount, rethAmount, rethAddress] = await getAmounts(signedDepositTx.value)
-  const useUniswap = options.fundingMethod === 'uniswap'
   if (useUniswap) {
     console.log(`Using RocketUniArb (${options.uniArbContract}) for arbitrage via a Uniswap flash swap (uniswap pool: ${options.uniPool})`)
+  }
+  else if (useHuffLoan) {
+    console.log(`Using RocketDepositArbitrage contract ${options.huffArbContract}`)
   }
   else {
     console.log(`Using RocketDepositArbitrage contract ${options.arbContract}`)
@@ -425,8 +430,10 @@ async function getArbTx(encodedSignedDepositTx, resumedDeposit) {
 
   console.log(`signedDepositTx.nonce = ${signedDepositTx.nonce}`)
 
-  const arbContract = new ethers.Contract(useUniswap ? options.uniArbContract : options.arbContract, arbAbi, provider)
-  const unsignedArbTx = options.fundingMethod == 'huffLoan' ?
+  const arbContract = new ethers.Contract(useUniswap ? options.uniArbContract :
+                                          useHuffLoan ? options.huffArbContract :
+                                          options.arbContract, arbAbi, provider)
+  const unsignedArbTx = useHuffLoan ?
     await arbContract.populateTransaction.arb(rethAmount, ethAmount, minProfit, swapData) :
     await arbContract.populateTransaction.arb(ethAmount, minProfit, swapData)
   unsignedArbTx.type = 2
