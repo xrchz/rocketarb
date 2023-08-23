@@ -1,5 +1,6 @@
 node_modules
 bundle.json
+bundle.*.json
 .env
 wallet.json
 *.evm
