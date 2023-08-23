@@ -243,8 +243,6 @@ function getDepositTx() {
   if (options.extraArgs) cmd = cmd.concat(' ', options.extraArgs)
   const salt = options.salt ? parseInt(options.salt, 16) : Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
 
-  console.log(`addUseCreditArg ${addUseCreditArg}`)
-
   const amountWei = oneEther.mul(options.amount)
   cmd = cmd.concat(' api node deposit',
     ' ', ethers.utils.formatUnits(amountWei, "wei"),
@@ -294,7 +292,7 @@ async function getSwapData(rethAmount, rethAddress, fromAddress) {
   const swap = await oneInchAPI('swap', swapParams)
   if (ethers.utils.getAddress(swap.tx.to) !== swapRouterAddress)
     console.log(`Warning: unexpected to address for swap: ${swap.tx.to}`)
-  console.log(JSON.stringify(swap.tx))
+  // console.log(JSON.stringify(swap.tx))
   return swap.tx.data
 }
 
