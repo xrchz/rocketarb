@@ -15,7 +15,8 @@
    the private key you just used to register your node and stake RPL on allnodes.
 */
 
-require('dotenv').config()
+import 'dotenv/config'
+import { ethers } from 'ethers'
 
 const CALLDATA = process.env.ALLNODES_DEPOSIT_CALLDATA
 const PRIVKEY = process.env.PRIVATE_KEY
@@ -24,9 +25,12 @@ const PRIOFEE = process.env.MAX_PRIORITY_FEE_PER_GAS || '2'
 const GASLIMIT = process.env.GAS_LIMIT || '2500000'
 const RPCURL = process.env.RPC_URL || 'http://localhost:8545'
 
-const ethers = require('ethers')
-
 const argv = process.argv
+
+if (argv.length == 3 && argv[2] == '--version') {
+  console.log(`rocketpool version 1.10.1`)
+  process.exit(0)
+}
 
 if (argv.length < 6 || argv[2] !== 'api' || argv[3] !== 'node' ||
     (argv[4] !== 'deposit' && argv[4] !== 'sign')) {
@@ -79,9 +83,4 @@ async function doDeposit() {
   console.log(rawTx.substring(2))
 }
 
-if (argv[4] === 'sign') {
-  doSign()
-}
-else {
-  doDeposit()
-}
+await (argv[4] === 'sign' ? doSign() : doDeposit())
