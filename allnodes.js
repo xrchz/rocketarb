@@ -50,6 +50,12 @@ const sigFields = "v r s".split(" ")
 const wallet = new ethers.Wallet(PRIVKEY).connect(provider)
 console.warn(`Created signer for ${wallet.address}`)
 
+const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
+const rocketStorage = new ethers.Contract(
+  rocketStorageAddress, ["function getAddress(bytes32 key) view returns (address)"], provider)
+console.log(await rocketStorage.getAddress(
+      ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketNodeDeposit"))))
+
 async function doSign() {
   const origTx = ethers.utils.parseTransaction(`0x${argv[5]}`)
   const signedTx = ethers.utils.parseTransaction(
@@ -66,7 +72,8 @@ async function doDeposit() {
   const prioFee = ethers.utils.parseUnits(PRIOFEE, 'gwei')
   const gasLimit = ethers.BigNumber.from(GASLIMIT)
   const tx = {
-    to: '0x1Cc9cF5586522c6F483E84A19c3C2B0B6d027bF0',
+    to: await rocketStorage.getAddress(
+      ethers.utils.keccak256(ethers.utils.toUtf8Bytes("contract.addressrocketNodeDeposit"))),
     value: ethers.BigNumber.from(argv[5]),
     gasLimit: gasLimit,
     maxFeePerGas: maxFee,
