@@ -22,7 +22,7 @@ const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
 const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const arbContractAddress = '0x786d8351f419F2Cb076664abcB5F8Ca04e9F1D7D'
 const swapRouterAddress = '0x1111111254EEB25477B68fb85Ed929f73A960582'
-const oneInchAPIBase = 'https://api.1inch.dev/v5.2/1/'
+const oneInchAPIBase = 'https://api.1inch.dev/swap/v5.2/1/'
 
 function oneInchAPI(method, params) {
   const url = `${oneInchAPIBase}${method}?${(new URLSearchParams(params)).toString()}`
