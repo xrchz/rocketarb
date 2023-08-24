@@ -151,6 +151,7 @@ async function run() {
     unsignedArbTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas.mul(4)
     unsignedArbTx.maxFeePerGas = feeData.maxFeePerGas.mul(3).div(2)
     unsignedArbTx.gasLimit = arbMaxGas
+    unsignedArbTx.nonce = await signer.getTransactionCount()
 
     return unsignedArbTx
   }
@@ -318,7 +319,8 @@ async function run() {
       }
       if (dpSpace.gt(dpArbMin)) {
         console.log(`Found ${ethers.utils.formatUnits(dpSpace, 'ether')} free space in the DP: arbing immediately`)
-        const unsignedArbTx = await makeArbTx(dpSpace)
+        const maxArb = ethers.utils.parseEther('32')
+        const unsignedArbTx = await makeArbTx(dpSpace.gt(maxArb) ? maxArb : dpSpace)
         console.log('Made tx')
         const maxBlockNumber = await provider.getBlockNumber() + maxTries
         console.log(`Will submit up till ${maxBlockNumber}`)
