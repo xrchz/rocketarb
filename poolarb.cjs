@@ -143,7 +143,7 @@ async function run() {
     if (ethers.utils.getAddress(swap.tx.to) !== swapRouterAddress)
       console.log(`Warning: unexpected to address for swap: ${swap.tx.to}`)
 
-    console.log(`arb(${rETHamount}, ${ethAmount}, ${minProfit}, ${swap.tx.data})`)
+    console.log(`arb(${rethAmount}, ${ethAmount}, ${minProfit}, ${swap.tx.data})`)
     const unsignedArbTx = await arbContract.populateTransaction.arb(
       rethAmount, ethAmount, minProfit, swap.tx.data)
     unsignedArbTx.chainId = 1
