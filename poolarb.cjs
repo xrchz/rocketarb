@@ -87,6 +87,8 @@ async function run() {
   const depositABI = [{"inputs":[{"internalType":"uint256","name":"_bondAmount","type":"uint256"},{"internalType":"uint256","name":"_minimumNodeFee","type":"uint256"},{"internalType":"bytes","name":"_validatorPubkey","type":"bytes"},{"internalType":"bytes","name":"_validatorSignature","type":"bytes"},{"internalType":"bytes32","name":"_depositDataRoot","type":"bytes32"},{"internalType":"uint256","name":"_salt","type":"uint256"},{"internalType":"address","name":"_expectedMinipoolAddress","type":"address"}],"name":"deposit","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_bondAmount","type":"uint256"},{"internalType":"uint256","name":"_minimumNodeFee","type":"uint256"},{"internalType":"bytes","name":"_validatorPubkey","type":"bytes"},{"internalType":"bytes","name":"_validatorSignature","type":"bytes"},{"internalType":"bytes32","name":"_depositDataRoot","type":"bytes32"},{"internalType":"uint256","name":"_salt","type":"uint256"},{"internalType":"address","name":"_expectedMinipoolAddress","type":"address"}],"name":"depositWithCredit","outputs":[],"stateMutability":"payable","type":"function"}]
   const rocketNodeDepositInterface = new ethers.utils.Interface(depositABI)
 
+  const validatorEther = ethers.utils.parseEther('32')
+
   const rethBurnInterface = new ethers.utils.Interface(
     ["function burn(uint256 _rethAmount) nonpayable"])
 
@@ -289,7 +291,8 @@ async function run() {
           canParse(rocketNodeDepositInterface, tx)
         ) {
           console.log(`Found ${hash}: a minipool deposit!`)
-          await processTx(tx, dpSpace.add(tx.value))
+          const mintSpace = validatorEther.sub(tx.value)
+          await processTx(tx, dpSpace.add(mintSpace))
         }
         else if (
           tx.to === rethAddress &&
