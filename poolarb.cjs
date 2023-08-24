@@ -27,7 +27,7 @@ const oneInchAPIBase = 'https://api.1inch.dev/v5.2/1/'
 function oneInchAPI(method, params) {
   const url = `${oneInchAPIBase}${method}?${(new URLSearchParams(params)).toString()}`
   return new Promise((resolve, reject) => {
-    const req = https.get(url,
+    const req = https.get(url, {headers: {'Authorization': `Bearer ${process.env.API_KEY}`}},
       (res) => {
         if (res.statusCode !== 200) {
           console.log(`Got bad status ${res.statusCode} for 1inch ${method}`)
