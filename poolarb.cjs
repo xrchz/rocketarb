@@ -120,7 +120,7 @@ async function run() {
     const swapParams = {
       src: rethAddress,
       dst: wethAddress,
-      fromAddress: arbContractAddress,
+      from: arbContractAddress,
       amount: rethAmount,
       slippage: options.slippage,
       allowPartialFill: false,
