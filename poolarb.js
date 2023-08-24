@@ -20,8 +20,9 @@ const provider = new ethers.providers.JsonRpcProvider(options.rpc)
 
 const rocketStorageAddress = '0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46'
 const wethAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
-const arbContractAddress = '0x1f7e55F2e907dDce8074b916f94F62C7e8A18571'
-const oneInchAPIBase = 'https://api.1inch.io/v4.0/1/'
+const arbContractAddress = '0x786d8351f419F2Cb076664abcB5F8Ca04e9F1D7D'
+const swapRouterAddress = '0x1111111254EEB25477B68fb85Ed929f73A960582'
+const oneInchAPIBase = 'https://api.1inch.dev/v5.2/1/'
 
 function oneInchAPI(method, params) {
   const url = `${oneInchAPIBase}${method}?${(new URLSearchParams(params)).toString()}`
@@ -45,7 +46,7 @@ const rocketStorage = new ethers.Contract(
   rocketStorageAddress, ["function getAddress(bytes32 key) view returns (address)"], provider)
 
 const arbContract = new ethers.Contract(
-  arbContractAddress, ["function arb(uint256 wethAmount, uint256 minProfit, bytes swapData) nonpayable"], provider)
+  arbContractAddress, ["function arb(uint256 rethAmount, uint256 ethAmount, uint256 minProfit, bytes swapData) nonpayable"], provider)
 
 async function run() {
   const rocketNodeDepositAddress = await rocketStorage.getAddress(
@@ -83,9 +84,8 @@ async function run() {
   const minDeposit = await depositSettings.getMinimumDeposit()
   const dpArbMin = minDeposit.mul(20) // TODO: tune
 
-  const rocketNodeDepositInterface = new ethers.utils.Interface(
-    ["function deposit(uint256 _minimumNodeFee, bytes _validatorPubkey, bytes _validatorSignature, " +
-      "bytes32 _depositDataRoot, uint256 _salt, address _expectedMinipoolAddress) payable"])
+  const depositABI = [{"inputs":[{"internalType":"uint256","name":"_bondAmount","type":"uint256"},{"internalType":"uint256","name":"_minimumNodeFee","type":"uint256"},{"internalType":"bytes","name":"_validatorPubkey","type":"bytes"},{"internalType":"bytes","name":"_validatorSignature","type":"bytes"},{"internalType":"bytes32","name":"_depositDataRoot","type":"bytes32"},{"internalType":"uint256","name":"_salt","type":"uint256"},{"internalType":"address","name":"_expectedMinipoolAddress","type":"address"}],"name":"deposit","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_bondAmount","type":"uint256"},{"internalType":"uint256","name":"_minimumNodeFee","type":"uint256"},{"internalType":"bytes","name":"_validatorPubkey","type":"bytes"},{"internalType":"bytes","name":"_validatorSignature","type":"bytes"},{"internalType":"bytes32","name":"_depositDataRoot","type":"bytes32"},{"internalType":"uint256","name":"_salt","type":"uint256"},{"internalType":"address","name":"_expectedMinipoolAddress","type":"address"}],"name":"depositWithCredit","outputs":[],"stateMutability":"payable","type":"function"}]
+  const rocketNodeDepositInterface = new ethers.utils.Interface(depositABI)
 
   const rethBurnInterface = new ethers.utils.Interface(
     ["function burn(uint256 _rethAmount) nonpayable"])
@@ -118,8 +118,8 @@ async function run() {
     console.log(`Aiming to arb ${ethers.utils.formatUnits(ethAmount, "ether")} ETH via ${ethers.utils.formatUnits(rethAmount, "ether")} rETH`)
 
     const swapParams = {
-      fromTokenAddress: rethAddress,
-      toTokenAddress: wethAddress,
+      src: rethAddress,
+      dst: wethAddress,
       fromAddress: arbContractAddress,
       amount: rethAmount,
       slippage: options.slippage,
@@ -136,16 +136,16 @@ async function run() {
     }
 
     // TODO: estimate the gas usage better somehow?
-    const arbMaxGas = ethers.BigNumber.from('900000')
-    const minProfitGas = ethers.BigNumber.from('700000')
+    const arbMaxGas = ethers.BigNumber.from('500000')
+    const minProfitGas = ethers.BigNumber.from('200000')
     const minProfit = feeData.maxFeePerGas.mul(minProfitGas)
 
-    if (ethers.utils.getAddress(swap.tx.to) !== '0x1111111254fb6c44bAC0beD2854e76F90643097d')
+    if (ethers.utils.getAddress(swap.tx.to) !== swapRouterAddress)
       console.log(`Warning: unexpected to address for swap: ${swap.tx.to}`)
 
-    console.log(`arb(${ethAmount}, ${minProfit}, ${swap.tx.data})`)
+    console.log(`arb(${rETHamount}, ${ethAmount}, ${minProfit}, ${swap.tx.data})`)
     const unsignedArbTx = await arbContract.populateTransaction.arb(
-      ethAmount, minProfit, swap.tx.data)
+      rethAmount, ethAmount, minProfit, swap.tx.data)
     unsignedArbTx.chainId = 1
     unsignedArbTx.type = 2
     unsignedArbTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas.mul(4)
