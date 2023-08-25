@@ -197,7 +197,7 @@ async function run() {
   async function processTx(tx, value) {
     const bundle = await makeBundle(tx, value)
     const currentBlockNumber = await provider.getBlockNumber()
-    const simulateOnly = 0
+    const simulateOnly = 0 // 0 = simulate and submit, 1 = submit without bundle, 2 = simulate only
 
     if (simulateOnly === 1) {
       console.log('Submitting bundle as individual transactions')
@@ -233,9 +233,8 @@ async function run() {
         targetBlockNumbers.push(targetBlockNumber)
         promises.push(flashbotsProvider.sendBundle(bundle, targetBlockNumber))
       }
-      const submissions = await Promise.all(promises)
       for (const [i, targetBlockNumber] of targetBlockNumbers.entries()) {
-        const submission = submissions[i]
+        const submission = await promises[i]
         console.log(`Target block number: ${targetBlockNumber}`)
         if ('error' in submission) {
           console.log(`RelayResponseError ${JSON.stringify(submission)}`)
@@ -248,10 +247,8 @@ async function run() {
           else {
             console.log(`Simulation used ${simulateRes.totalGasUsed} gas @ ${simulateRes.results[0].gasPrice}`)
             if ('firstRevert' in simulateRes && simulateRes.firstRevert !== undefined) {
-              if (!('revert' in simulateRes.firstRevert))
-                console.log(JSON.stringify(simulateRes.firstRevert))
-              else
-                console.log(`Revert during simulation, aborting: ${simulateRes.firstRevert.revert}`)
+              console.log(JSON.stringify(simulateRes.firstRevert))
+              console.log('Revert during simulation, aborting')
             }
             else {
               console.log(JSON.stringify(simulateRes))
