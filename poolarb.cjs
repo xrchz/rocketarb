@@ -9,6 +9,8 @@ const fs = require('fs/promises')
 
 program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-s, --slippage <percentage>', 'slippage tolerance for the swap', '2')
+       .option('-gs, --swap-gas-limit <gas>', 'gas limit for swap transaction', '400000')
+       .option('-ga, --arb-gas-limit <gas>', 'gas limit for arb transaction', '600000')
        .option('-w, --wallet-file <file>', 'saved wallet for arbitrage transactions', 'wallet.json')
        .option('-m, --max-tries <m>', 'number of blocks to attempt to submit bundle for', '2')
 program.parse()
@@ -88,6 +90,7 @@ async function run() {
   const rocketNodeDepositInterface = new ethers.utils.Interface(depositABI)
 
   const validatorEther = ethers.utils.parseEther('32')
+  const maxArb = validatorEther
 
   const rethBurnInterface = new ethers.utils.Interface(
     ["function burn(uint256 _rethAmount) nonpayable"])
@@ -125,6 +128,7 @@ async function run() {
       from: arbContractAddress,
       amount: rethAmount,
       slippage: options.slippage,
+      gasLimit: options.swapGasLimit,
       allowPartialFill: false,
       disableEstimate: true
     }
@@ -138,8 +142,8 @@ async function run() {
     }
 
     // TODO: estimate the gas usage better somehow?
-    const arbMaxGas = ethers.BigNumber.from('500000')
-    const minProfitGas = ethers.BigNumber.from('200000')
+    const arbMaxGas = ethers.BigNumber.from(options.arbGasLimit)
+    const minProfitGas = ethers.BigNumber.from('100000')
     const minProfit = feeData.maxFeePerGas.mul(minProfitGas)
 
     if (ethers.utils.getAddress(swap.tx.to) !== swapRouterAddress)
@@ -195,7 +199,7 @@ async function run() {
   }
 
   async function processTx(tx, value) {
-    const bundle = await makeBundle(tx, value)
+    const bundle = await makeBundle(tx, value.gt(maxArb) ? maxArb : value)
     const currentBlockNumber = await provider.getBlockNumber()
     const simulateOnly = 0 // 0 = simulate and submit, 1 = submit without bundle, 2 = simulate only
 
@@ -319,7 +323,6 @@ async function run() {
       }
       if (dpSpace.gt(dpArbMin)) {
         console.log(`Found ${ethers.utils.formatUnits(dpSpace, 'ether')} free space in the DP: arbing immediately`)
-        const maxArb = ethers.utils.parseEther('32')
         const unsignedArbTx = await makeArbTx(dpSpace.gt(maxArb) ? maxArb : dpSpace)
         console.log('Made tx')
         const maxBlockNumber = await provider.getBlockNumber() + maxTries
