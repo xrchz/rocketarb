@@ -13,6 +13,7 @@ const { execSync } = child_process
 
 program.option('-r, --rpc <url>', 'RPC endpoint URL', 'http://localhost:8545')
        .option('-t, --premium', 'print the rETH/ETH primary and secondary rates and exit')
+       .option('--vote', 'interactively vote on rocketpool snapshot using your node account')
        .option('-f, --max-fee <maxFee>', 'max transaction fee per gas in gwei')
        .option('-i, --max-prio <maxPrio>', 'max transaction priority fee per gas in gwei')
        .option('-n, --dry-run', 'simulate only, do not submit transaction bundle')
@@ -477,6 +478,119 @@ async function retrieveDeposit() {
 async function retrieveBundle() {
   console.log(`Resuming with bundle from ${options.bundleFile}`)
   return JSON.parse(await fs.readFile(options.bundleFile, 'utf-8'))
+}
+
+import snapshot from '@snapshot-labs/snapshot.js'
+
+if (options.vote) {
+  console.log(`Node Voting Override Interface!`)
+  const network = '1'
+  let cmd = options.daemon.concat(' api wallet status')
+  const walletStatus = JSON.parse(runCmd(cmd))
+  const voter = ethers.utils.getAddress(walletStatus.accountAddress)
+  console.log(`Voting as ${voter}`)
+  const client = new snapshot.Client712('https://hub.snapshot.org')
+  const graphqlUrl = 'https://hub.snapshot.org/graphql'
+  const space = 'rocketpool-dao.eth'
+  const proposalsQuery = {
+    __name: 'Proposals',
+    proposals: {
+      __args: {
+        where: {
+          space,
+          state: 'active'
+        }
+      },
+      id: true,
+      choices: true,
+      title: true
+    }
+  }
+  const proposals = await snapshot.utils.subgraphRequest(graphqlUrl, proposalsQuery).then(r => r.proposals)
+  console.log('')
+  console.log(`Open proposals: ${JSON.stringify(proposals)}`)
+  const vpQueries = proposals.map(p => ({
+    __name: 'Vp',
+    vp: {
+      __args: {
+        voter,
+        space,
+        proposal: p.id
+      },
+      vp_by_strategy: true,
+    }
+  }))
+  const vps = await Promise.all(vpQueries.map(q => snapshot.utils.subgraphRequest(graphqlUrl, q))).then(a => a.map(x => x.vp))
+  console.log('')
+  console.log(`Your current vote power: ${JSON.stringify(proposals.map((p, i) => ({title: p.title, vp: vps[i]})))}`)
+  const currentVotesQuery = {
+    __name: 'Votes',
+    votes: {
+      __args: {
+        where: {
+          voter,
+          proposal_in: proposals.map(p => p.id)
+        }
+      },
+      choice: true,
+      proposal: { id: true }
+    }
+  }
+  const votes = await snapshot.utils.subgraphRequest(graphqlUrl, currentVotesQuery).then(vs =>
+    vs.votes.map(v => {
+      const p = proposals.find(p => p.id == v.proposal.id)
+      return {
+        title: p.title,
+        choice: p.choices[v.choice - 1]
+      }
+    })
+  )
+  console.log('')
+  console.log(`Your current votes: ${JSON.stringify(votes)}`)
+  const privKey = JSON.parse(runCmd(options.daemon.concat(' api wallet export'))).accountPrivateKey
+  const wallet = new ethers.Wallet(privKey)
+  if (wallet.address != voter) {
+    console.error(`Error: account from private key did not match voter - exiting`)
+    process.exit(1)
+  }
+  for (const {id, choices, title} of proposals) {
+    console.log('')
+    const doVote = prompt(`Do you want to change/add your vote on ${title}? `).trim().toLowerCase()
+    if (!(doVote === 'y' || doVote === 'yes')) {
+      console.log(`Skipping ${title}`)
+      continue
+    }
+    while (true) {
+      console.log(`${title} options:`)
+      for (const [i, choice] of choices.entries()) {
+        console.log(`${i+1}: ${choice}`)
+      }
+      const input = prompt(`Please select an option number (or q to quit) `).trim().toLowerCase()
+      const selection = parseInt(input)
+      if (input === 'q' || input === 'quit' || input === 'skip' || input === 'exit') {
+        console.log(`Skipping ${title}`)
+        break
+      }
+      else if (1 <= selection && selection <= choices.length) {
+        const confirmation = prompt(`Are you sure you want to vote for ${choices[selection-1]} on ${title}? `).trim().toLowerCase()
+        if (!(confirmation === 'y' || confirmation === 'yes'))
+          continue
+        const receipt = await client.vote(wallet, voter, {
+          space,
+          proposal: id,
+          type: 'single-choice',
+          choice: selection,
+          app: 'rocketarb'
+        })
+        console.log(`Got receipt: ${JSON.stringify(receipt)}`)
+        break
+      }
+      else {
+        console.log(`Invalid selection - please enter a listed option number`)
+      }
+    }
+  }
+  process.exit(0)
 }
 
 if (options.premium) {

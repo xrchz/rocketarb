@@ -10,6 +10,7 @@
     "prompt-sync": "4",
     "dotenv": "16",
     "ethers": "5",
+    "@snapshot-labs/snapshot.js": "0",
     "@flashbots/ethers-provider-bundle": "0"
   }
 }
