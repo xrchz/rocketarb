@@ -4,7 +4,10 @@
    Instructions:
 
    This script is meant to be run as the daemon for ./rocketarb.js
-   e.g. ./rocketarb.js --daemon ./allnodes.js
+   e.g. `./rocketarb.js --daemon ./allnodes.js`
+
+   If doing a credit minipool, you need to also add ` --amount 0` to the
+   command above.
 
    You should complete through step 17 in this guide:
    https://blog.allnodes.com/a-step-by-step-guide-for-launching-your-own-rocket-pool-minipool-on-allnodes-777c2972526e
