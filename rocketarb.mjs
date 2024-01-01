@@ -677,6 +677,7 @@ else {
         console.log('Bundle successfully included on chain!')
         console.log(`Moving ${options.bundleFile} to bundle.${minipoolAddress}.json`)
         await fs.rename(options.bundleFile, `bundle.${minipoolAddress}.json`)
+	console.log(`You might have to restart the smartnode validator container/process for it to pick up the new validator. Otherwise it might miss attestations and block proposals once it is activated by the beaconchain.`)
         process.exit()
       }
       else {
