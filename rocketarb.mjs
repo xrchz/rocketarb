@@ -639,7 +639,10 @@ if (options.dryRun) {
   console.log(`Target block number: ${targetBlockNumber}`)
   const signedBundle = await flashbotsProvider.signBundle(bundle)
   const simulation = await flashbotsProvider.simulate(signedBundle, targetBlockNumber)
-  console.log(JSON.stringify(simulation, null, 2))
+  console.log(`Simulation results: ${JSON.stringify(simulation, null, 2)}`)
+  if ('error' in simulation) {
+    console.error(`Simulation error: ${simulation.error.message}`)
+  }
 }
 else {
   if (!options.yes) {
